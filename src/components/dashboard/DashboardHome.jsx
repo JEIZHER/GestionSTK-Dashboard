@@ -1,27 +1,35 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
+import IngresosModule from './IngresosModule';
 import { 
   User, 
   Settings, 
   LogOut, 
   Moon, 
   Sun,
-  ChevronRight,
   ChevronLeft,
-  Shield,
   LayoutDashboard,
-  Box,
-  ExternalLink,
   Menu,
   RefreshCcw,
   PackageCheck,
   ClipboardList,
   Wallet,
-  BarChart3
+  BarChart3,
+  CalendarDays,
+  ArrowRight
 } from "lucide-react";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer
+} from 'recharts';
 
 export default function DashboardHome() {
   const { user, logout } = useAuth();
@@ -35,6 +43,22 @@ export default function DashboardHome() {
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
+
+  // Estados para filtros de Recepción
+  const [dateRange, setDateRange] = useState({
+    from: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0]
+  });
+
+  const chartData = [
+    { name: 'Lun', normales: 45, ext: 12 },
+    { name: 'Mar', normales: 52, ext: 15 },
+    { name: 'Mie', normales: 48, ext: 8 },
+    { name: 'Jue', normales: 61, ext: 20 },
+    { name: 'Vie', normales: 55, ext: 18 },
+    { name: 'Sab', normales: 40, ext: 10 },
+    { name: 'Dom', normales: 35, ext: 5 },
+  ];
 
   useEffect(() => {
     async function fetchData() {
@@ -390,42 +414,613 @@ export default function DashboardHome() {
 
           {activeTab === "recepcion" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "2rem" }}>
-                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
-                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Control de entrada y verificación de bultos</p>
+               <header style={{ 
+                 marginBottom: "2rem", 
+                 display: "flex", 
+                 justifyContent: "space-between", 
+                 alignItems: "flex-end",
+                 flexWrap: "wrap",
+                 gap: "1.5rem"
+               }}>
+                <div>
+                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Monitoreo de flujo y bultos procesados</p>
+                </div>
+
+                {/* Filtro de Fechas */}
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "0.75rem", 
+                    backgroundColor: theme.sidebar, 
+                    padding: "0.6rem 1rem", 
+                    borderRadius: "16px",
+                    border: `1px solid ${theme.border}`,
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                    position: "relative",
+                    zIndex: 1000
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <CalendarDays size={16} color={theme.accent} />
+                    <input 
+                      type="date" 
+                      value={dateRange.from}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.target.showPicker) e.target.showPicker();
+                      }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setDateRange(prev => ({ ...prev, from: e.target.value }));
+                      }}
+                      style={{ 
+                        background: "none", 
+                        border: "none", 
+                        color: theme.text, 
+                        fontSize: "0.8rem", 
+                        fontWeight: 700,
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    />
+                  </div>
+                  <ArrowRight size={14} color="#888" />
+                  <input 
+                    type="date" 
+                    value={dateRange.to}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (e.target.showPicker) e.target.showPicker();
+                    }}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      setDateRange(prev => ({ ...prev, to: e.target.value }));
+                    }}
+                    style={{ 
+                      background: "none", 
+                      border: "none", 
+                      color: theme.text, 
+                      fontSize: "0.8rem", 
+                      fontWeight: 700, 
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  />
+                </div>
               </header>
-              <div style={{ padding: "4rem", textAlign: "center", backgroundColor: theme.sidebar, borderRadius: "24px", border: `1px solid ${theme.border}` }}>
-                <PackageCheck size={48} style={{ color: theme.accent, opacity: 0.5, marginBottom: "1rem" }} />
-                <p style={{ fontWeight: 700 }}>Módulo de Recepción</p>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666" }}>Próximamente: Integración con escáner móvil</p>
+
+              {/* Resumen de Recepción (UI Compacta y Centrada) */}
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
+                gap: "1rem", 
+                marginBottom: "2rem" 
+              }}>
+                <div style={{ 
+                  backgroundColor: theme.sidebar, 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  border: `1px solid ${theme.border}`,
+                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>JORNADAS DISPONIBLES</p>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
+                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>26</span>
+                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>DÍAS</span>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  backgroundColor: theme.sidebar, 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  border: `1px solid ${theme.border}`,
+                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
+                  textAlign: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos Consolidados</p>
+                  <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center" }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>NORMALES</p>
+                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900 }}>1.408</p>
+                    </div>
+                    <div style={{ width: "1px", height: "24px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>EXT</p>
+                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: theme.accent }}>240</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  backgroundColor: theme.accent, 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  color: "white",
+                  boxShadow: `0 8px 24px -6px ${theme.accent}66`,
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Gestión</p>
+                  <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
+                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>1.648</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de Flujo Operativo */}
+              <div style={{ 
+                backgroundColor: theme.sidebar, 
+                borderRadius: "28px", 
+                border: `1px solid ${theme.border}`, 
+                padding: "2rem",
+                boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
+                height: "400px",
+                display: "flex",
+                flexDirection: "column"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Flujo de Paquetes por Día</h3>
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.primary }} />
+                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Normales</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.accent }} />
+                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>EXT</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, width: "100%" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorNormal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.primary} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={theme.primary} stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorExt" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.accent} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={theme.accent} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        dy={10}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: theme.sidebar, 
+                          borderRadius: "16px", 
+                          border: `1px solid ${theme.border}`,
+                          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+                          fontSize: "0.8rem",
+                          fontWeight: 700
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="normales" 
+                        stroke={theme.primary} 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorNormal)" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="ext" 
+                        stroke={theme.accent} 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorExt)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "rendicion" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "2rem" }}>
-                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición</h2>
-                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de planilla y liquidación de servicios</p>
+               <header style={{ 
+                 marginBottom: "2rem", 
+                 display: "flex", 
+                 justifyContent: "space-between", 
+                 alignItems: "flex-end",
+                 flexWrap: "wrap",
+                 gap: "1.5rem"
+               }}>
+                <div>
+                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición Operativa</h2>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de planilla y liquidación de servicios entregados</p>
+                </div>
+
+                {/* Filtro de Fechas */}
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "0.75rem", 
+                    backgroundColor: theme.sidebar, 
+                    padding: "0.6rem 1rem", 
+                    borderRadius: "16px",
+                    border: `1px solid ${theme.border}`,
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                    position: "relative",
+                    zIndex: 1000
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <CalendarDays size={16} color={theme.accent} />
+                    <input 
+                      type="date" 
+                      value={dateRange.from}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.target.showPicker) e.target.showPicker();
+                      }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setDateRange(prev => ({ ...prev, from: e.target.value }));
+                      }}
+                      style={{ 
+                        background: "none", 
+                        border: "none", 
+                        color: theme.text, 
+                        fontSize: "0.8rem", 
+                        fontWeight: 700,
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    />
+                  </div>
+                  <ArrowRight size={14} color="#888" />
+                  <input 
+                    type="date" 
+                    value={dateRange.to}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (e.target.showPicker) e.target.showPicker();
+                    }}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      setDateRange(prev => ({ ...prev, to: e.target.value }));
+                    }}
+                    style={{ 
+                      background: "none", 
+                      border: "none", 
+                      color: theme.text, 
+                      fontSize: "0.8rem", 
+                      fontWeight: 700, 
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  />
+                </div>
               </header>
-              <div style={{ padding: "4rem", textAlign: "center", backgroundColor: theme.sidebar, borderRadius: "24px", border: `1px solid ${theme.border}` }}>
-                <ClipboardList size={48} style={{ color: theme.accent, opacity: 0.5, marginBottom: "1rem" }} />
-                <p style={{ fontWeight: 700 }}>Módulo de Rendición</p>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666" }}>Próximamente: Resumen de pagos y saldos</p>
+
+              {/* Resumen de Rendición */}
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
+                gap: "1rem", 
+                marginBottom: "2rem" 
+              }}>
+                <div style={{ 
+                  backgroundColor: theme.sidebar, 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  border: `1px solid ${theme.border}`,
+                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>JORNADAS TRABAJADAS</p>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
+                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>24</span>
+                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>DÍAS</span>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  backgroundColor: theme.sidebar, 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  border: `1px solid ${theme.border}`,
+                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
+                  textAlign: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>ENTREGADOS CONSOLIDADOS</p>
+                  <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center" }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>NORMALES</p>
+                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900 }}>1.280</p>
+                    </div>
+                    <div style={{ width: "1px", height: "24px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>EXT</p>
+                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: theme.accent }}>185</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  backgroundColor: "#34C759", 
+                  padding: "1.25rem 1.5rem", 
+                  borderRadius: "20px", 
+                  color: "white",
+                  boxShadow: `0 8px 24px -6px rgba(52, 199, 89, 0.4)`,
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center"
+                }}>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Liquidado</p>
+                  <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
+                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>1.465</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de Rendición */}
+              <div style={{ 
+                backgroundColor: theme.sidebar, 
+                borderRadius: "28px", 
+                border: `1px solid ${theme.border}`, 
+                padding: "2rem",
+                boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
+                height: "400px",
+                display: "flex",
+                flexDirection: "column"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Rendimiento de Entrega</h3>
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.primary }} />
+                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Normales</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.accent }} />
+                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>EXT</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, width: "100%" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorNormal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.primary} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={theme.primary} stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorExt" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.accent} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={theme.accent} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        dy={10}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: theme.sidebar, 
+                          borderRadius: "16px", 
+                          border: `1px solid ${theme.border}`,
+                          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+                          fontSize: "0.8rem",
+                          fontWeight: 700
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="normales" 
+                        stroke={theme.primary} 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorNormal)" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="ext" 
+                        stroke={theme.accent} 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorExt)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "ingresos" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "2rem" }}>
-                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Ingresos</h2>
-                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Flujo de caja y recaudación diaria</p>
+               <header style={{ 
+                 marginBottom: "2rem", 
+                 display: "flex", 
+                 justifyContent: "space-between", 
+                 alignItems: "flex-end",
+                 flexWrap: "wrap",
+                 gap: "1.5rem"
+               }}>
+                <div>
+                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Gestión de Ingresos</h2>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Tarifas activas sincronizadas desde la App</p>
+                </div>
+
+                {/* Filtro de Fechas */}
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "0.75rem", 
+                    backgroundColor: theme.sidebar, 
+                    padding: "0.6rem 1rem", 
+                    borderRadius: "16px",
+                    border: `1px solid ${theme.border}`,
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                    position: "relative",
+                    zIndex: 1000
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <CalendarDays size={16} color={theme.accent} />
+                    <input 
+                      type="date" 
+                      value={dateRange.from}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.target.showPicker) e.target.showPicker();
+                      }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setDateRange(prev => ({ ...prev, from: e.target.value }));
+                      }}
+                      style={{ 
+                        background: "none", 
+                        border: "none", 
+                        color: theme.text, 
+                        fontSize: "0.8rem", 
+                        fontWeight: 700,
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    />
+                  </div>
+                  <ArrowRight size={14} color="#888" />
+                  <input 
+                    type="date" 
+                    value={dateRange.to}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (e.target.showPicker) e.target.showPicker();
+                    }}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      setDateRange(prev => ({ ...prev, to: e.target.value }));
+                    }}
+                    style={{ 
+                      background: "none", 
+                      border: "none", 
+                      color: theme.text, 
+                      fontSize: "0.8rem", 
+                      fontWeight: 700, 
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  />
+                </div>
               </header>
-              <div style={{ padding: "4rem", textAlign: "center", backgroundColor: theme.sidebar, borderRadius: "24px", border: `1px solid ${theme.border}` }}>
-                <Wallet size={48} style={{ color: theme.accent, opacity: 0.5, marginBottom: "1rem" }} />
-                <p style={{ fontWeight: 700 }}>Módulo de Ingresos</p>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666" }}>Visualización de recaudación por sector</p>
+
+              {/* Módulo Dinámico de Ingresos (Sincronizado) */}
+              <div style={{ marginBottom: '2.5rem' }}>
+                <IngresosModule dateRange={dateRange} />
+              </div>
+
+              {/* Gráfico de Tendencia de Ingresos (Anterior) */}
+              <div style={{ 
+                backgroundColor: theme.sidebar, 
+                borderRadius: "28px", 
+                border: `1px solid ${theme.border}`, 
+                padding: "2rem",
+                boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
+                height: "350px",
+                display: "flex",
+                flexDirection: "column"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Historial de Liquidación</h3>
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#34C759" }} />
+                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Ingreso</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, width: "100%" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#34C759" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#34C759" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        dy={10}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: theme.sidebar, 
+                          borderRadius: "16px", 
+                          border: `1px solid ${theme.border}`,
+                          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+                          fontSize: "0.8rem",
+                          fontWeight: 700
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="normales" 
+                        stroke="#34C759" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorInc)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
           )}
@@ -506,6 +1101,25 @@ export default function DashboardHome() {
   );
 }
 
+function RateTag({ label, value, color, textColor }) {
+  return (
+    <div style={{ 
+      display: "flex", 
+      alignItems: "center", 
+      gap: "0.5rem", 
+      backgroundColor: color, 
+      padding: "0.4rem 0.75rem", 
+      borderRadius: "10px",
+      border: "1px solid rgba(0,0,0,0.05)",
+      boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+      whiteSpace: "nowrap"
+    }}>
+      <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "rgba(0,0,0,0.5)", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontSize: "0.85rem", fontWeight: 900, color: textColor }}>{value}</span>
+    </div>
+  );
+}
+
 function SidebarItem({ icon, label, active, onClick, theme }) {
   return (
     <button 
@@ -553,36 +1167,4 @@ function StatCard({ label, value, color, theme }) {
   );
 }
 
-function DataRow({ label, value, theme, isDark, isBadge = false, isMono = false }) {
-  return (
-    <div style={{ 
-      display: "flex", 
-      justifyContent: "space-between", 
-      alignItems: "center", 
-      borderBottom: `1px solid ${theme.border}`, 
-      paddingBottom: "1.25rem" 
-    }}>
-      <span style={{ 
-        fontSize: "0.75rem", 
-        fontWeight: 800, 
-        color: isDark ? "#666" : "#999", 
-        textTransform: "uppercase", 
-        letterSpacing: "0.08em" 
-      }}>
-        {label}
-      </span>
-      <span style={{ 
-        fontWeight: 700, 
-        color: theme.text,
-        backgroundColor: isBadge ? (theme.primary + "15") : "transparent",
-        padding: isBadge ? "0.35rem 1rem" : "0",
-        borderRadius: "10px",
-        fontSize: isBadge ? "0.8rem" : "1rem",
-        fontFamily: isMono ? "monospace" : "inherit"
-      }}>
-        {value || "Pendiente"}
-      </span>
-    </div>
-  );
-}
 
