@@ -1,14 +1,27 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useAuth } from './hooks/useAuth';
+import { ThemeProvider } from './contexts/ThemeContext';
+import Login from './components/auth/Login';
+import DashboardHome from './components/dashboard/DashboardHome';
+import { Loader2 } from 'lucide-react';
 
 function App() {
-  return (
-    <Router>
-      <div className='min-h-screen bg-gray-100'>
-        <h1 className='text-3xl font-bold text-red-600 p-8'>GestionSTK Dashboard PWA</h1>
-        <p className='px-8'>Proyecto inicializado correctamente con Vite + React + Tailwind</p>
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-gray-50'>
+        <Loader2 className='h-10 w-10 animate-spin text-red-600' />
       </div>
-    </Router>
+    );
+  }
+
+  return (
+    <ThemeProvider>
+      <div className='min-h-screen'>
+        {!user ? <Login /> : <DashboardHome />}
+      </div>
+    </ThemeProvider>
   );
 }
 
