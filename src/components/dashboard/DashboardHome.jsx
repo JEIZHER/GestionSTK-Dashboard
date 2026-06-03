@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -39,26 +39,82 @@ export default function DashboardHome() {
   const [stats, setStats] = useState({
     totalSectores: 0,
     totalContactos: 0,
-    promedioPrecision: 0
+    promedioPrecision: 0,
+    rendiciones: []
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
 
   // Estados para filtros de Recepción
   const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+    from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
   });
 
-  const chartData = [
-    { name: 'Lun', normales: 45, ext: 12 },
-    { name: 'Mar', normales: 52, ext: 15 },
-    { name: 'Mie', normales: 48, ext: 8 },
-    { name: 'Jue', normales: 61, ext: 20 },
-    { name: 'Vie', normales: 55, ext: 18 },
-    { name: 'Sab', normales: 40, ext: 10 },
-    { name: 'Dom', normales: 35, ext: 5 },
-  ];
+  // Función para calcular días hábiles (Lunes a Sábado) en el rango seleccionado
+  const calculateWorkDaysInPeriod = (from, to) => {
+    let count = 0;
+    const current = new Date(from);
+    const end = new Date(to);
+    
+    while (current <= end) {
+      if (current.getDay() !== 0) { // 0 es Domingo
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return count;
+  };
+
+  const workDaysInPeriod = calculateWorkDaysInPeriod(dateRange.from, dateRange.to);
+
+  // Cálculos consolidados desde rendiciones
+  const totals = stats.rendiciones.reduce((acc, curr) => {
+    acc.rec_normal += (curr.rec_cte || 0);
+    acc.rec_ext += (curr.rec_ext || 0);
+    acc.rec_cod += (curr.rec_cod || 0);
+    acc.rec_pxp += (curr.rec_pxp || 0);
+    
+    acc.ent_normal += (curr.ent_cte || 0);
+    acc.ent_ext += (curr.ent_ext || 0);
+    acc.ent_cod += (curr.ent_cod || 0);
+    acc.ent_pxp += (curr.ent_pxp || 0);
+    
+    acc.dev_normal += (curr.dev_cte || 0);
+    acc.dev_ext += (curr.dev_ext || 0);
+    
+    // Sumar custom bultos
+    if (curr.datos_custom) {
+      Object.keys(curr.datos_custom).forEach(key => {
+        const item = curr.datos_custom[key];
+        acc.rec_custom += (item.rec || 0);
+        acc.ent_custom += (item.ent || 0);
+        
+        // Agregar desglose por nombre de tarifa
+        if (!acc.detail_custom[key]) {
+          acc.detail_custom[key] = { rec: 0, ent: 0 };
+        }
+        acc.detail_custom[key].rec += (item.rec || 0);
+        acc.detail_custom[key].ent += (item.ent || 0);
+      });
+    }
+    return acc;
+  }, { 
+    rec_normal: 0, rec_ext: 0, rec_cod: 0, rec_pxp: 0, rec_custom: 0,
+    ent_normal: 0, ent_ext: 0, ent_cod: 0, ent_pxp: 0, ent_custom: 0,
+    dev_normal: 0, dev_ext: 0,
+    detail_custom: {} 
+  });
+
+  const chartData = stats.rendiciones.length > 0 
+    ? stats.rendiciones.map(r => ({
+        name: new Date(r.fecha).toLocaleDateString('es-CL', { weekday: 'short' }),
+        normales: (r.ent_cte || 0),
+        ext: (r.ent_ext || 0)
+      }))
+    : [
+        { name: 'Sin Datos', normales: 0, ext: 0 }
+      ];
 
   useEffect(() => {
     async function fetchData() {
@@ -73,43 +129,47 @@ export default function DashboardHome() {
         
         if (profileError) throw profileError;
         
-        // Limpiar el valor de region_asignada (quitando Saltos de línea ocultos \r\n)
         const cleanRegion = profileData.region_asignada?.replace(/[\r\n\t]/g, "").trim();
         const cleanProfile = { ...profileData, region_asignada: cleanRegion };
-        
         setProfile(cleanProfile);
 
-        // 2. Fetch Count Sectores (filtrado por la región limpia)
-        const { count: sectoresCount, error: sectoresError } = await supabase
+        // 2. Fetch Count Sectores
+        const { count: sectoresCount } = await supabase
           .from("sectores")
           .select("*", { count: "exact", head: true })
           .eq("region_asignada", cleanRegion);
-        
-        if (sectoresError) throw sectoresError;
 
-        // 3. Fetch Count Contactos (filtrado por la región limpia)
-        const { count: contactosCount, error: contactosError } = await supabase
+        // 3. Fetch Count Contactos
+        const { count: contactosCount } = await supabase
           .from("contactos")
           .select("*", { count: "exact", head: true })
           .eq("region_asignada", cleanRegion);
-        
-        if (contactosError) throw contactosError;
 
         // 4. Fetch Precision Average
-        const { data: precisionData, error: precisionError } = await supabase
+        const { data: precisionData } = await supabase
           .from("reportes_precision")
           .select("precision_percent");
         
-        if (precisionError) throw precisionError;
-
-        const avg = precisionData.length > 0 
+        const avg = precisionData?.length > 0 
           ? (precisionData.reduce((acc, curr) => acc + (curr.precision_percent || 0), 0) / precisionData.length).toFixed(1)
           : 0;
+
+        // 5. Fetch Rendiciones Diarias (para conteos reales)
+        const { data: rendData, error: rendError } = await supabase
+          .from("rendiciones_diarias")
+          .select("*")
+          .eq("auth_id", user.id)
+          .gte("fecha", dateRange.from)
+          .lte("fecha", dateRange.to)
+          .order("fecha", { ascending: true });
+
+        if (rendError) throw rendError;
 
         setStats({
           totalSectores: sectoresCount || 0,
           totalContactos: contactosCount || 0,
-          promedioPrecision: avg
+          promedioPrecision: avg,
+          rendiciones: rendData || []
         });
 
       } catch (err) {
@@ -119,7 +179,7 @@ export default function DashboardHome() {
       }
     }
     fetchData();
-  }, [user]);
+  }, [user, dateRange.from, dateRange.to]); // Se dispara cuando cambian las fechas o el usuario
 
   if (loading) return (
     <div style={{ 
@@ -492,11 +552,11 @@ export default function DashboardHome() {
                 </div>
               </header>
 
-              {/* Resumen de Recepción (UI Compacta y Centrada) */}
+              {/* Resumen de Recepción (UI Compacta con Datos Reales) */}
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
-                gap: "1rem", 
+                gridTemplateColumns: "1fr 1fr 1fr", 
+                gap: "1.25rem", 
                 marginBottom: "2rem" 
               }}>
                 <div style={{ 
@@ -508,12 +568,13 @@ export default function DashboardHome() {
                   textAlign: "center",
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center"
+                  alignItems: "center",
+                  justifyContent: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>JORNADAS DISPONIBLES</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>DIAS EN RANGO (L-S)</p>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>26</span>
-                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>DÍAS</span>
+                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>{workDaysInPeriod}</span>
+                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>HÁBILES</span>
                   </div>
                 </div>
 
@@ -526,16 +587,35 @@ export default function DashboardHome() {
                   textAlign: "center"
                 }}>
                   <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos Consolidados</p>
-                  <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center" }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>NORMALES</p>
-                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900 }}>1.408</p>
+                  <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
+                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900 }}>{totals.rec_normal}</p>
                     </div>
-                    <div style={{ width: "1px", height: "24px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>EXT</p>
-                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: theme.accent }}>240</p>
+                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>EXT</p>
+                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: theme.accent }}>{totals.rec_ext}</p>
                     </div>
+                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>COD</p>
+                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#007AFF" }}>{totals.rec_cod}</p>
+                    </div>
+                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>PXP</p>
+                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#5856D6" }}>{totals.rec_pxp}</p>
+                    </div>
+                    {Object.keys(totals.detail_custom).map(key => (
+                      <React.Fragment key={key}>
+                        <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{key}</p>
+                          <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].rec}</p>
+                        </div>
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
 
@@ -550,9 +630,9 @@ export default function DashboardHome() {
                   flexDirection: "column",
                   justifyContent: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Gestión</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Recepción</p>
                   <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>1.648</span>
+                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>{totals.rec_normal + totals.rec_ext + totals.rec_cod + totals.rec_pxp + totals.rec_custom}</span>
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
                   </div>
                 </div>
@@ -722,7 +802,7 @@ export default function DashboardHome() {
                 </div>
               </header>
 
-              {/* Resumen de Rendición */}
+              {/* Resumen de Rendición (Datos Reales) */}
               <div style={{ 
                 display: "grid", 
                 gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
@@ -742,7 +822,7 @@ export default function DashboardHome() {
                 }}>
                   <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>JORNADAS TRABAJADAS</p>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>24</span>
+                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>{stats.rendiciones.length}</span>
                     <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>DÍAS</span>
                   </div>
                 </div>
@@ -756,16 +836,35 @@ export default function DashboardHome() {
                   textAlign: "center"
                 }}>
                   <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>ENTREGADOS CONSOLIDADOS</p>
-                  <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center" }}>
+                  <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <div>
-                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>NORMALES</p>
-                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900 }}>1.280</p>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
+                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900 }}>{totals.ent_normal}</p>
                     </div>
-                    <div style={{ width: "1px", height: "24px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
                     <div>
-                      <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>EXT</p>
-                      <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: theme.accent }}>185</p>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>EXT</p>
+                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.accent }}>{totals.ent_ext}</p>
                     </div>
+                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>COD</p>
+                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#007AFF" }}>{totals.ent_cod}</p>
+                    </div>
+                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>PXP</p>
+                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#5856D6" }}>{totals.ent_pxp}</p>
+                    </div>
+                    {Object.keys(totals.detail_custom).map(key => (
+                      <React.Fragment key={key}>
+                        <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
+                        <div>
+                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{key}</p>
+                          <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].ent}</p>
+                        </div>
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
 
@@ -782,7 +881,7 @@ export default function DashboardHome() {
                 }}>
                   <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Liquidado</p>
                   <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>1.465</span>
+                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>{totals.ent_normal + totals.ent_ext + totals.ent_cod + totals.ent_pxp + totals.ent_custom}</span>
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
                   </div>
                 </div>
@@ -954,7 +1053,10 @@ export default function DashboardHome() {
 
               {/* Módulo Dinámico de Ingresos (Sincronizado) */}
               <div style={{ marginBottom: '2.5rem' }}>
-                <IngresosModule dateRange={dateRange} />
+                <IngresosModule 
+                  dateRange={dateRange} 
+                  externalRendiciones={stats.rendiciones} 
+                />
               </div>
 
               {/* Gráfico de Tendencia de Ingresos (Anterior) */}

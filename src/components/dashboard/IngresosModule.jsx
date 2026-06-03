@@ -9,98 +9,158 @@ import {
   Briefcase
 } from 'lucide-react';
 
-export default function IngresosModule({ dateRange }) {
+export default function IngresosModule({ dateRange, externalRendiciones }) {
   const { user } = useAuth();
-  const [cuenta, setCuenta] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState({
+    cuenta: null,
+    rendiciones: externalRendiciones || [],
+    loading: !externalRendiciones
+  });
 
   useEffect(() => {
-    const fetchCuenta = async () => {
+    const fetchData = async () => {
       if (!user?.id) return;
-      setLoading(true);
+      
+      // Si ya tenemos las rendiciones desde el padre, solo buscamos la cuenta
       try {
-        const { data, error } = await supabase
+        const { data: cuentaData, error: cuentaError } = await supabase
           .from('cuenta')
           .select('*')
           .eq('auth_id', user.id)
           .single();
         
-        if (error && error.code !== 'PGRST116') throw error;
-        setCuenta(data);
+        if (cuentaError && cuentaError.code !== 'PGRST116') throw cuentaError;
+
+        let rendData = externalRendiciones;
+        if (!rendData) {
+          const { data: fetchedRend, error: rendError } = await supabase
+            .from('rendiciones_diarias')
+            .select('*')
+            .eq('auth_id', user.id)
+            .gte('fecha', dateRange.from)
+            .lte('fecha', dateRange.to)
+            .order('fecha', { ascending: false });
+          if (rendError) throw rendError;
+          rendData = fetchedRend;
+        }
+
+        setData({
+          cuenta: cuentaData,
+          rendiciones: rendData || [],
+          loading: false
+        });
       } catch (err) {
-        console.error('Error fetching cuenta:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching dashboard data:', err);
+        setData(prev => ({ ...prev, loading: false }));
       }
     };
-    fetchCuenta();
-  }, [user]);
+    fetchData();
+  }, [user, dateRange, externalRendiciones]);
 
-  if (loading) return <div className="p-10 text-center text-gray-400">Cargando tarifas...</div>;
+  // Cálculos de Ingresos
+  const calculateEarnings = () => {
+    if (!data.cuenta || data.rendiciones.length === 0) return 0;
+    
+    const { cuenta, rendiciones } = data;
+    let total = 0;
+
+    rendiciones.forEach(r => {
+      // Determinamos si este día el KPI fue logrado (o fallback a lo que diga la cuenta globalmente)
+      const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : (data.cuenta.kpi >= 95);
+
+      // 1. Ingresos Standard (Basados en KPI)
+      // Si se logró el KPI, usamos la tarifa de incentivo (kpi_xxx), si no la base (pago_xxx)
+      total += (r.ent_cte || 0) * (kpiLogrado ? (data.cuenta.kpi_cte || 0) : (data.cuenta.pago_nacional || 0));
+      total += (r.ent_ext || 0) * (kpiLogrado ? (data.cuenta.kpi_ext || 0) : (data.cuenta.pago_extranjero || 0));
+      total += (r.ent_cod || 0) * (kpiLogrado ? (data.cuenta.kpi_cod || 0) : (data.cuenta.pago_cod || 0));
+      total += (r.ent_pxp || 0) * (kpiLogrado ? (data.cuenta.kpi_pxp || 0) : (data.cuenta.pago_pxp || 0));
+
+      // 2. Custom Tariffs logic
+      if (r.datos_custom && typeof r.datos_custom === 'object') {
+        Object.keys(r.datos_custom).forEach(key => {
+          const stats = r.datos_custom[key]; // { rec, ent, dev }
+          const config = data.cuenta.tarifas_custom?.find(t => t.nombre === key);
+          
+          if (config && stats.ent > 0) {
+            // Si depende del KPI y se logró, usamos con_kpi, si no base
+            const price = (config.depende_kpi && kpiLogrado) ? (config.con_kpi || 0) : (config.base || 0);
+            total += stats.ent * price;
+          }
+        });
+      }
+    });
+
+    return total;
+  };
+
+  const totalIngresos = calculateEarnings();
+  const formatCurrency = (val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+
+  if (data.loading) return <div className="p-10 text-center text-gray-400">Cargando datos...</div>;
 
   return (
     <div className="space-y-4">
       {/* Grid Principal */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="flex gap-4">
         {/* KPI de Gestión */}
-        <div className="bg-[#FBFF00] p-5 rounded-[20px] shadow-sm flex flex-col justify-center items-center text-black border border-black/5">
-          <p className="text-[10px] font-black uppercase tracking-tighter opacity-70 mb-1">KPI Objetivo</p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black">{cuenta?.kpi || '0'}</span>
-            <span className="text-sm font-bold">%</span>
+        <div className="w-[85px] bg-[#FBFF00] p-2 rounded-[18px] shadow-sm flex flex-col justify-center items-center text-black border border-black/5 shrink-0">
+          <p className="text-[8px] font-black uppercase tracking-tighter opacity-70">KPI</p>
+          <div className="flex items-baseline">
+            <span className="text-3xl font-black leading-none">{data.cuenta?.kpi || '0'}</span>
+            <span className="text-[11px] font-bold">%</span>
           </div>
         </div>
 
-        {/* Tarifas Base */}
-        <div className="col-span-3 bg-white p-5 rounded-[20px] border border-gray-100 shadow-sm overflow-hidden">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Tarifario Base Nacional / EXT</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <TarifaItem label="NORMAL (BASE)" value={`$${cuenta?.pago_nacional || '0'}`} />
-            <TarifaItem label="NORMAL (KPI)" value={`$${cuenta?.kpi_cte || '0'}`} highlight />
-            <TarifaItem label="EXT (BASE)" value={`$${cuenta?.pago_extranjero || '0'}`} />
-            <TarifaItem label="EXT (KPI)" value={`$${cuenta?.kpi_ext || '0'}`} highlight />
+        {/* Tarifas y Precios */}
+        <div className="flex-1 bg-white p-4 rounded-[20px] border border-gray-100 shadow-sm overflow-hidden">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Tarifario de Servicios (Base / Con KPI)</p>
+          <div className="flex flex-wrap gap-2">
+            <TarifaItem 
+              label="CTE" 
+              value={`${formatCurrency(data.cuenta?.pago_nacional || 0)} / ${formatCurrency(data.cuenta?.kpi_cte || 0)}`} 
+              highlight 
+            />
+            <TarifaItem 
+              label="EXT" 
+              value={`${formatCurrency(data.cuenta?.pago_extranjero || 0)} / ${formatCurrency(data.cuenta?.kpi_ext || 0)}`} 
+              highlight 
+            />
+            <TarifaItem 
+              label="COD" 
+              value={`${formatCurrency(data.cuenta?.pago_cod || 0)} / ${formatCurrency(data.cuenta?.kpi_cod || 0)}`} 
+              highlight 
+            />
+            <TarifaItem 
+              label="PXP" 
+              value={`${formatCurrency(data.cuenta?.pago_pxp || 0)} / ${formatCurrency(data.cuenta?.kpi_pxp || 0)}`} 
+              highlight 
+            />
+            {data.cuenta?.tarifas_custom?.map((t, i) => (
+              <TarifaItem 
+                key={i}
+                label={t.nombre} 
+                value={t.depende_kpi ? `${formatCurrency(t.base || 0)} / ${formatCurrency(t.con_kpi || 0)}` : formatCurrency(t.base || 0)} 
+                highlight={t.depende_kpi}
+              />
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Tipos de Pago Personalizados */}
-      {cuenta?.tarifas_custom?.length > 0 && (
-        <div className="bg-white p-5 rounded-[20px] border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Cargos Adicionales</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {cuenta.tarifas_custom.map((t, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
-                <div className="h-8 w-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-blue-600">
-                  <Briefcase size={14} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">{t.nombre}</p>
-                  <p className="text-sm font-black text-gray-900">${t.base} <span className="text-[9px] text-gray-400">/ ${t.con_kpi}</span></p>
-                </div>
-                {t.depende_kpi && (
-                  <div className="ml-auto bg-amber-100 text-amber-700 p-1 rounded-md" title="Depende de KPI">
-                    <Target size={12} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recaudación Proyectada (Placeholder) */}
+      {/* Recaudación Proyectada Real */}
       <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-sm flex justify-between items-center">
         <div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Recaudación Final Estimada</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 text-blue-600">Recaudación Final Acumulada</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-gray-900">$1.856.162</span>
+            <span className="text-3xl font-black text-gray-900">{formatCurrency(totalIngresos)}</span>
             <span className="text-green-500 text-[10px] font-bold flex items-center gap-1">
-              <TrendingUp size={10}/> +4.2%
+              <TrendingUp size={10}/> Real
             </span>
           </div>
+          <p className="text-[9px] text-gray-400 mt-1 italic">Calculado sobre {data.rendiciones.length} rendiciones diarias</p>
         </div>
-        <div className="h-12 w-12 bg-gray-900 rounded-xl flex items-center justify-center">
-          <DollarSign size={20} className="text-[#FBFF00]" />
+        <div className="h-14 w-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-200">
+          <DollarSign size={24} className="text-[#FBFF00]" />
         </div>
       </div>
     </div>
@@ -109,9 +169,9 @@ export default function IngresosModule({ dateRange }) {
 
 function TarifaItem({ label, value, highlight }) {
   return (
-    <div className={`p-3 rounded-[14px] border ${highlight ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
-      <p className="text-[8px] font-black text-gray-400 uppercase mb-0.5">{label}</p>
-      <p className={`text-sm font-black ${highlight ? 'text-amber-700' : 'text-gray-900'}`}>{value}</p>
+    <div className={`px-4 py-2 rounded-xl border flex items-center justify-between gap-4 ${highlight ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+      <p className="text-[9px] font-black text-gray-500 uppercase truncate max-w-[100px]">{label}</p>
+      <p className={`text-sm font-black whitespace-nowrap ${highlight ? 'text-amber-700' : 'text-gray-900'}`}>{value}</p>
     </div>
   );
 }
