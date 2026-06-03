@@ -1,12 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { 
   DollarSign, 
-  Target, 
-  TrendingUp, 
-  Package, 
-  Briefcase
+  TrendingUp
 } from 'lucide-react';
 
 export default function IngresosModule({ dateRange, externalRendiciones }) {
@@ -31,6 +28,87 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
         
         if (cuentaError && cuentaError.code !== 'PGRST116') throw cuentaError;
 
+        const aggregateRendicionesByFecha = rows => {
+          const map = new Map();
+          rows.forEach(r => {
+            if (!r || !r.fecha) return;
+            const key = r.fecha;
+            const existing = map.get(key) || {
+              fecha: key,
+              rec_cte: 0,
+              ent_cte: 0,
+              dev_cte: 0,
+              rec_ext: 0,
+              ent_ext: 0,
+              dev_ext: 0,
+              rec_cod: 0,
+              ent_cod: 0,
+              dev_cod: 0,
+              rec_pxp: 0,
+              ent_pxp: 0,
+              dev_pxp: 0,
+              datos_custom: {},
+              _total_rec: 0,
+              _total_ent: 0,
+            };
+
+            existing.rec_cte += (r.rec_cte || 0);
+            existing.ent_cte += (r.ent_cte || 0);
+            existing.dev_cte += (r.dev_cte || 0);
+            existing.rec_ext += (r.rec_ext || 0);
+            existing.ent_ext += (r.ent_ext || 0);
+            existing.dev_ext += (r.dev_ext || 0);
+            existing.rec_cod += (r.rec_cod || 0);
+            existing.ent_cod += (r.ent_cod || 0);
+            existing.dev_cod += (r.dev_cod || 0);
+            existing.rec_pxp += (r.rec_pxp || 0);
+            existing.ent_pxp += (r.ent_pxp || 0);
+            existing.dev_pxp += (r.dev_pxp || 0);
+
+            const datosCustom =
+              typeof r.datos_custom === "string"
+                ? JSON.parse(r.datos_custom || "{}")
+                : r.datos_custom;
+
+            if (datosCustom && typeof datosCustom === "object") {
+              Object.keys(datosCustom).forEach(customKey => {
+                const item = datosCustom[customKey] || {};
+                if (!existing.datos_custom[customKey]) {
+                  existing.datos_custom[customKey] = { rec: 0, ent: 0, dev: 0 };
+                }
+                existing.datos_custom[customKey].rec += (item.rec || 0);
+                existing.datos_custom[customKey].ent += (item.ent || 0);
+                existing.datos_custom[customKey].dev += (item.dev || 0);
+              });
+            }
+
+            existing._total_rec +=
+              (r.rec_cte || 0) +
+              (r.rec_ext || 0) +
+              (r.rec_cod || 0) +
+              (r.rec_pxp || 0);
+            existing._total_ent +=
+              (r.ent_cte || 0) +
+              (r.ent_ext || 0) +
+              (r.ent_cod || 0) +
+              (r.ent_pxp || 0);
+
+            map.set(key, existing);
+          });
+
+          return Array.from(map.values())
+            .map(item => {
+              const totalRec = item._total_rec || 0;
+              const totalEnt = item._total_ent || 0;
+              const kpiActual = totalRec > 0 ? (totalEnt / totalRec) * 100 : 0;
+              return {
+                ...item,
+                kpi_logrado: kpiActual >= 95,
+              };
+            })
+            .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+        };
+
         let rendData = externalRendiciones;
         if (!rendData) {
           const { data: fetchedRend, error: rendError } = await supabase
@@ -46,7 +124,7 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
 
         setData({
           cuenta: cuentaData,
-          rendiciones: rendData || [],
+          rendiciones: aggregateRendicionesByFecha(rendData || []),
           loading: false
         });
       } catch (err) {
@@ -61,7 +139,7 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
   const calculateEarnings = () => {
     if (!data.cuenta || data.rendiciones.length === 0) return 0;
     
-    const { cuenta, rendiciones } = data;
+    const { rendiciones } = data;
     let total = 0;
 
     rendiciones.forEach(r => {
@@ -79,7 +157,7 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
       if (r.datos_custom && typeof r.datos_custom === 'object') {
         Object.keys(r.datos_custom).forEach(key => {
           const stats = r.datos_custom[key]; // { rec, ent, dev }
-          const config = data.cuenta.tarifas_custom?.find(t => t.nombre === key);
+          const config = data.cuenta.tarifas_custom?.find(t => t.nombre === key || t.label === key);
           
           if (config && stats.ent > 0) {
             // Si depende del KPI y se logró, usamos con_kpi, si no base
@@ -113,7 +191,14 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
 
         {/* Tarifas y Precios */}
         <div className="flex-1 bg-white p-4 rounded-[20px] border border-gray-100 shadow-sm overflow-hidden">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Tarifario de Servicios (Base / Con KPI)</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0">Tarifario de Servicios (Base / Con KPI)</p>
+            {Number(data.cuenta?.piso) > 0 && (
+              <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 uppercase tracking-widest">
+                Base Diaria: {formatCurrency(data.cuenta?.piso)}
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <TarifaItem 
               label="CTE" 
@@ -138,7 +223,7 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
             {data.cuenta?.tarifas_custom?.map((t, i) => (
               <TarifaItem 
                 key={i}
-                label={t.nombre} 
+                label={t.label || t.nombre} 
                 value={t.depende_kpi ? `${formatCurrency(t.base || 0)} / ${formatCurrency(t.con_kpi || 0)}` : formatCurrency(t.base || 0)} 
                 highlight={t.depende_kpi}
               />

@@ -35,6 +35,7 @@ export default function DashboardHome() {
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
+  const [cuenta, setCuenta] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [stats, setStats] = useState({
     totalSectores: 0,
@@ -44,6 +45,22 @@ export default function DashboardHome() {
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
+  const [visibleCurves, setVisibleCurves] = useState(['total']);
+
+  // Colores para las curvas
+  const curveColors = {
+    total: theme.primary,
+    cte: "#8E8E93",
+    ext: theme.accent,
+    cod: "#007AFF",
+    pxp: "#5856D6",
+    custom: theme.primary // Fallback para custom
+  };
+
+  // Vistas de gráficos
+  const [chartViewRec, setChartViewRec] = useState("total");
+  const [chartViewEnt, setChartViewEnt] = useState("total");
+  const [chartViewIng, setChartViewIng] = useState("total");
 
   // Estados para filtros de Recepción
   const [dateRange, setDateRange] = useState({
@@ -67,6 +84,106 @@ export default function DashboardHome() {
   };
 
   const workDaysInPeriod = calculateWorkDaysInPeriod(dateRange.from, dateRange.to);
+
+  const parseTarifasCustom = value => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        return JSON.parse(value || "[]");
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const getCustomLabel = key => {
+    const tarifas = parseTarifasCustom(cuenta?.tarifas_custom);
+    const match = tarifas.find(t => t.nombre === key || t.label === key);
+    return match?.label || match?.nombre || key;
+  };
+
+  const aggregateRendicionesByFecha = rows => {
+    const map = new Map();
+    rows.forEach(r => {
+      if (!r || !r.fecha) return;
+      const key = r.fecha;
+      const existing = map.get(key) || {
+        fecha: key,
+        rec_cte: 0,
+        ent_cte: 0,
+        dev_cte: 0,
+        rec_ext: 0,
+        ent_ext: 0,
+        dev_ext: 0,
+        rec_cod: 0,
+        ent_cod: 0,
+        dev_cod: 0,
+        rec_pxp: 0,
+        ent_pxp: 0,
+        dev_pxp: 0,
+        datos_custom: {},
+        _total_rec: 0,
+        _total_ent: 0,
+      };
+
+      existing.rec_cte += (r.rec_cte || 0);
+      existing.ent_cte += (r.ent_cte || 0);
+      existing.dev_cte += (r.dev_cte || 0);
+      existing.rec_ext += (r.rec_ext || 0);
+      existing.ent_ext += (r.ent_ext || 0);
+      existing.dev_ext += (r.dev_ext || 0);
+      existing.rec_cod += (r.rec_cod || 0);
+      existing.ent_cod += (r.ent_cod || 0);
+      existing.dev_cod += (r.dev_cod || 0);
+      existing.rec_pxp += (r.rec_pxp || 0);
+      existing.ent_pxp += (r.ent_pxp || 0);
+      existing.dev_pxp += (r.dev_pxp || 0);
+
+      const datosCustom =
+        typeof r.datos_custom === "string"
+          ? JSON.parse(r.datos_custom || "{}")
+          : r.datos_custom;
+
+      if (datosCustom && typeof datosCustom === "object") {
+        Object.keys(datosCustom).forEach(customKey => {
+          const item = datosCustom[customKey] || {};
+          if (!existing.datos_custom[customKey]) {
+            existing.datos_custom[customKey] = { rec: 0, ent: 0, dev: 0 };
+          }
+          existing.datos_custom[customKey].rec += (item.rec || 0);
+          existing.datos_custom[customKey].ent += (item.ent || 0);
+          existing.datos_custom[customKey].dev += (item.dev || 0);
+        });
+      }
+
+      existing._total_rec +=
+        (r.rec_cte || 0) +
+        (r.rec_ext || 0) +
+        (r.rec_cod || 0) +
+        (r.rec_pxp || 0);
+      existing._total_ent +=
+        (r.ent_cte || 0) +
+        (r.ent_ext || 0) +
+        (r.ent_cod || 0) +
+        (r.ent_pxp || 0);
+
+      map.set(key, existing);
+    });
+
+    return Array.from(map.values())
+      .map(item => {
+        const totalRec = item._total_rec || 0;
+        const totalEnt = item._total_ent || 0;
+        const kpiActual = totalRec > 0 ? (totalEnt / totalRec) * 100 : 0;
+        return {
+          ...item,
+          kpi_logrado: kpiActual >= 95,
+        };
+      })
+      .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  };
 
   // Cálculos consolidados desde rendiciones
   const totals = stats.rendiciones.reduce((acc, curr) => {
@@ -107,13 +224,71 @@ export default function DashboardHome() {
   });
 
   const chartData = stats.rendiciones.length > 0 
-    ? stats.rendiciones.map(r => ({
-        name: new Date(r.fecha).toLocaleDateString('es-CL', { weekday: 'short' }),
-        normales: (r.ent_cte || 0),
-        ext: (r.ent_ext || 0)
-      }))
+    ? stats.rendiciones.map(r => {
+        let recCustom = 0; let entCustom = 0; let ingCustom = 0;
+        const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : true;
+        const customBreakdown = {};
+
+        if (r.datos_custom && typeof r.datos_custom === "object") {
+          Object.keys(r.datos_custom).forEach(key => {
+            const item = r.datos_custom[key];
+            const label = getCustomLabel(key);
+            recCustom += (item.rec || 0);
+            entCustom += (item.ent || 0);
+
+            const config = parseTarifasCustom(cuenta?.tarifas_custom)?.find(t => t.nombre === key || t.label === key);
+            let itemIng = 0;
+            if (config && item.ent > 0) {
+              const price = (config.depende_kpi && kpiLogrado) ? (config.con_kpi || 0) : (config.base || 0);
+              itemIng = item.ent * price;
+              ingCustom += itemIng;
+            }
+
+            customBreakdown[`rec_${label}`] = (item.rec || 0);
+            customBreakdown[`ent_${label}`] = (item.ent || 0);
+            customBreakdown[`ing_${label}`] = itemIng;
+          });
+        }
+        
+        const c_kpiCte = cuenta?.kpi_cte || 0; const c_cte = cuenta?.pago_nacional || 0;
+        const c_kpiExt = cuenta?.kpi_ext || 0; const c_ext = cuenta?.pago_extranjero || 0;
+        const c_kpiCod = cuenta?.kpi_cod || 0; const c_cod = cuenta?.pago_cod || 0;
+        const c_kpiPxp = cuenta?.kpi_pxp || 0; const c_pxp = cuenta?.pago_pxp || 0;
+
+        const ingCte = (r.ent_cte || 0) * (kpiLogrado ? c_kpiCte : c_cte);
+        const ingExt = (r.ent_ext || 0) * (kpiLogrado ? c_kpiExt : c_ext);
+        const ingCod = (r.ent_cod || 0) * (kpiLogrado ? c_kpiCod : c_cod);
+        const ingPxp = (r.ent_pxp || 0) * (kpiLogrado ? c_kpiPxp : c_pxp);
+
+        return {
+          name: new Date(r.fecha).toLocaleDateString('es-CL', { weekday: 'short' }),
+          
+          rec_total: (r.rec_cte||0) + (r.rec_ext||0) + (r.rec_cod||0) + (r.rec_pxp||0) + recCustom,
+          rec_cte: r.rec_cte || 0,
+          rec_ext: r.rec_ext || 0,
+          rec_cod: r.rec_cod || 0,
+          rec_pxp: r.rec_pxp || 0,
+          rec_custom: recCustom,
+
+          ent_total: (r.ent_cte||0) + (r.ent_ext||0) + (r.ent_cod||0) + (r.ent_pxp||0) + entCustom,
+          ent_cte: r.ent_cte || 0,
+          ent_ext: r.ent_ext || 0,
+          ent_cod: r.ent_cod || 0,
+          ent_pxp: r.ent_pxp || 0,
+          ent_custom: entCustom,
+
+          ing_total: ingCte + ingExt + ingCod + ingPxp + ingCustom,
+          ing_cte: ingCte,
+          ing_ext: ingExt,
+          ing_cod: ingCod,
+          ing_pxp: ingPxp,
+          ing_custom: ingCustom,
+          
+          ...customBreakdown
+        }
+      })
     : [
-        { name: 'Sin Datos', normales: 0, ext: 0 }
+        { name: 'Sin Datos', rec_total: 0, ent_total: 0, ing_total: 0 }
       ];
 
   useEffect(() => {
@@ -132,6 +307,15 @@ export default function DashboardHome() {
         const cleanRegion = profileData.region_asignada?.replace(/[\r\n\t]/g, "").trim();
         const cleanProfile = { ...profileData, region_asignada: cleanRegion };
         setProfile(cleanProfile);
+
+        const { data: cuentaData, error: cuentaError } = await supabase
+          .from("cuenta")
+          .select("*")
+          .eq("auth_id", user.id)
+          .single();
+
+        if (cuentaError && cuentaError.code !== "PGRST116") throw cuentaError;
+        setCuenta(cuentaData || null);
 
         // 2. Fetch Count Sectores
         const { count: sectoresCount } = await supabase
@@ -169,7 +353,7 @@ export default function DashboardHome() {
           totalSectores: sectoresCount || 0,
           totalContactos: contactosCount || 0,
           promedioPrecision: avg,
-          rendiciones: rendData || []
+          rendiciones: aggregateRendicionesByFecha(rendData || [])
         });
 
       } catch (err) {
@@ -440,7 +624,7 @@ export default function DashboardHome() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
                   <StatCard label="Sectores" value={stats.totalSectores} color={theme.accent} theme={theme} />
                   <StatCard label="Contactos" value={stats.totalContactos} color={theme.primary} theme={theme} />
-                  <StatCard label="Precisión" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} />
+                  <StatCard label="OF Auto deteccion" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} />
               </div>
 
               <div style={{ 
@@ -484,7 +668,7 @@ export default function DashboardHome() {
                }}>
                 <div>
                   <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
-                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Monitoreo de flujo y bultos procesados</p>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Total de paquetes recibidos</p>
                 </div>
 
                 {/* Filtro de Fechas */}
@@ -586,7 +770,7 @@ export default function DashboardHome() {
                   boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
                   textAlign: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos Consolidados</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos por tipo de OF</p>
                   <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center" }}>
                     <div style={{ textAlign: "center" }}>
                       <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
@@ -611,7 +795,7 @@ export default function DashboardHome() {
                       <React.Fragment key={key}>
                         <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
                         <div style={{ textAlign: "center" }}>
-                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{key}</p>
+                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{getCustomLabel(key)}</p>
                           <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].rec}</p>
                         </div>
                       </React.Fragment>
@@ -651,15 +835,37 @@ export default function DashboardHome() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Flujo de Paquetes por Día</h3>
-                  <div style={{ display: "flex", gap: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.primary }} />
-                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Normales</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.accent }} />
-                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>EXT</span>
-                    </div>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                    {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
+                      const isActive = visibleCurves.includes(type);
+                      const color = curveColors[type.toLowerCase()] || curveColors.custom;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setVisibleCurves(prev => 
+                              prev.includes(type) 
+                                ? prev.filter(t => t !== type) 
+                                : [...prev, type]
+                            );
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "12px",
+                            fontSize: "0.65rem",
+                            fontWeight: 800,
+                            border: `1px solid ${isActive ? color : theme.border}`,
+                            backgroundColor: isActive ? `${color}15` : "transparent",
+                            color: isActive ? color : "#888",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            textTransform: "uppercase"
+                          }}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -667,14 +873,12 @@ export default function DashboardHome() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="colorNormal" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={theme.primary} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={theme.primary} stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorExt" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={theme.accent} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={theme.accent} stopOpacity={0}/>
-                        </linearGradient>
+                        {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
+                          <linearGradient key={type} id={`colorRec_${type}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
                       <XAxis 
@@ -699,22 +903,18 @@ export default function DashboardHome() {
                           fontWeight: 700
                         }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="normales" 
-                        stroke={theme.primary} 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorNormal)" 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="ext" 
-                        stroke={theme.accent} 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorExt)" 
-                      />
+                      {visibleCurves.map(type => (
+                        <Area 
+                          key={type}
+                          type="monotone" 
+                          dataKey={`rec_${type}`} 
+                          stroke={curveColors[type.toLowerCase()] || curveColors.custom} 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill={`url(#colorRec_${type})`} 
+                          hide={!visibleCurves.includes(type)}
+                        />
+                      ))}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -734,7 +934,7 @@ export default function DashboardHome() {
                }}>
                 <div>
                   <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición Operativa</h2>
-                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de planilla y liquidación de servicios entregados</p>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de Nomina, total entregados</p>
                 </div>
 
                 {/* Filtro de Fechas */}
@@ -835,7 +1035,7 @@ export default function DashboardHome() {
                   boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
                   textAlign: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>ENTREGADOS CONSOLIDADOS</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>ENTREGADOS POR TIPO DE OF</p>
                   <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <div>
                       <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
@@ -860,7 +1060,7 @@ export default function DashboardHome() {
                       <React.Fragment key={key}>
                         <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
                         <div>
-                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{key}</p>
+                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{getCustomLabel(key)}</p>
                           <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].ent}</p>
                         </div>
                       </React.Fragment>
@@ -879,7 +1079,7 @@ export default function DashboardHome() {
                   flexDirection: "column",
                   justifyContent: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Liquidado</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Entregados</p>
                   <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
                     <span style={{ fontSize: "2rem", fontWeight: 900 }}>{totals.ent_normal + totals.ent_ext + totals.ent_cod + totals.ent_pxp + totals.ent_custom}</span>
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
@@ -900,15 +1100,37 @@ export default function DashboardHome() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Rendimiento de Entrega</h3>
-                  <div style={{ display: "flex", gap: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.primary }} />
-                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Normales</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: theme.accent }} />
-                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>EXT</span>
-                    </div>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                    {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
+                      const isActive = visibleCurves.includes(type);
+                      const color = curveColors[type.toLowerCase()] || curveColors.custom;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setVisibleCurves(prev => 
+                              prev.includes(type) 
+                                ? prev.filter(t => t !== type) 
+                                : [...prev, type]
+                            );
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "12px",
+                            fontSize: "0.65rem",
+                            fontWeight: 800,
+                            border: `1px solid ${isActive ? color : theme.border}`,
+                            backgroundColor: isActive ? `${color}15` : "transparent",
+                            color: isActive ? color : "#888",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            textTransform: "uppercase"
+                          }}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -916,14 +1138,12 @@ export default function DashboardHome() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="colorNormal" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={theme.primary} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={theme.primary} stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorExt" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={theme.accent} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={theme.accent} stopOpacity={0}/>
-                        </linearGradient>
+                        {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
+                          <linearGradient key={type} id={`colorEnt_${type}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
                       <XAxis 
@@ -948,22 +1168,17 @@ export default function DashboardHome() {
                           fontWeight: 700
                         }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="normales" 
-                        stroke={theme.primary} 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorNormal)" 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="ext" 
-                        stroke={theme.accent} 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorExt)" 
-                      />
+                      {visibleCurves.map(type => (
+                        <Area 
+                          key={type}
+                          type="monotone" 
+                          dataKey={`ent_${type}`} 
+                          stroke={curveColors[type.toLowerCase()] || curveColors.custom} 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill={`url(#colorEnt_${type})`} 
+                        />
+                      ))}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1072,11 +1287,37 @@ export default function DashboardHome() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Historial de Liquidación</h3>
-                  <div style={{ display: "flex", gap: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                       <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#34C759" }} />
-                       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#888" }}>Ingreso</span>
-                    </div>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                    {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
+                      const isActive = visibleCurves.includes(type);
+                      const color = curveColors[type.toLowerCase()] || curveColors.custom;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setVisibleCurves(prev => 
+                              prev.includes(type) 
+                                ? prev.filter(t => t !== type) 
+                                : [...prev, type]
+                            );
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "12px",
+                            fontSize: "0.65rem",
+                            fontWeight: 800,
+                            border: `1px solid ${isActive ? color : theme.border}`,
+                            backgroundColor: isActive ? `${color}15` : "transparent",
+                            color: isActive ? color : "#888",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            textTransform: "uppercase"
+                          }}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1084,10 +1325,12 @@ export default function DashboardHome() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#34C759" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#34C759" stopOpacity={0}/>
-                        </linearGradient>
+                        {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
+                          <linearGradient key={type} id={`colorIng_${type}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
                       <XAxis 
@@ -1103,6 +1346,7 @@ export default function DashboardHome() {
                         tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
                       />
                       <Tooltip 
+                        formatter={(val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val)}
                         contentStyle={{ 
                           backgroundColor: theme.sidebar, 
                           borderRadius: "16px", 
@@ -1112,14 +1356,17 @@ export default function DashboardHome() {
                           fontWeight: 700
                         }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="normales" 
-                        stroke="#34C759" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorInc)" 
-                      />
+                      {visibleCurves.map(type => (
+                        <Area 
+                          key={type}
+                          type="monotone" 
+                          dataKey={`ing_${type}`} 
+                          stroke={curveColors[type.toLowerCase()] || curveColors.custom} 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill={`url(#colorIng_${type})`} 
+                        />
+                      ))}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1203,24 +1450,24 @@ export default function DashboardHome() {
   );
 }
 
-function RateTag({ label, value, color, textColor }) {
-  return (
-    <div style={{ 
-      display: "flex", 
-      alignItems: "center", 
-      gap: "0.5rem", 
-      backgroundColor: color, 
-      padding: "0.4rem 0.75rem", 
-      borderRadius: "10px",
-      border: "1px solid rgba(0,0,0,0.05)",
-      boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-      whiteSpace: "nowrap"
-    }}>
-      <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "rgba(0,0,0,0.5)", textTransform: "uppercase" }}>{label}</span>
-      <span style={{ fontSize: "0.85rem", fontWeight: 900, color: textColor }}>{value}</span>
-    </div>
-  );
-}
+// function RateTag({ label, value, color, textColor }) {
+//   return (
+//     <div style={{ 
+//       display: "flex", 
+//       alignItems: "center", 
+//       gap: "0.5rem", 
+//       backgroundColor: color, 
+//       padding: "0.4rem 0.75rem", 
+//       borderRadius: "10px",
+//       border: "1px solid rgba(0,0,0,0.05)",
+//       boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+//       whiteSpace: "nowrap"
+//     }}>
+//       <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "rgba(0,0,0,0.5)", textTransform: "uppercase" }}>{label}</span>
+//       <span style={{ fontSize: "0.85rem", fontWeight: 900, color: textColor }}>{value}</span>
+//     </div>
+//   );
+// }
 
 function SidebarItem({ icon, label, active, onClick, theme }) {
   return (
