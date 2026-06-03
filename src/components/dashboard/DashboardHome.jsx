@@ -19,7 +19,8 @@ import {
   Wallet,
   BarChart3,
   CalendarDays,
-  ArrowRight
+  ArrowRight,
+  Monitor
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -36,7 +37,8 @@ export default function DashboardHome() {
   const { theme, isDark, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [cuenta, setCuenta] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [stats, setStats] = useState({
     totalSectores: 0,
     totalContactos: 0,
@@ -46,6 +48,53 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
   const [visibleCurves, setVisibleCurves] = useState(['total']);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width <= 768);
+      if (width <= 1024) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      // Prevenir que el navegador muestre el prompt automático
+      e.preventDefault();
+      // Guardar el evento para dispararlo más tarde
+      setDeferredPrompt(e);
+      // Mostrar nuestro banner personalizado
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    // Mostrar el prompt nativo
+    deferredPrompt.prompt();
+
+    // Esperar la respuesta del usuario
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+
+    // Limpiar el prompt guardado
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
 
   // Colores para las curvas
   const curveColors = {
@@ -401,40 +450,50 @@ export default function DashboardHome() {
       transition: "background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
     }}>
       <aside style={{ 
-        width: isSidebarOpen ? "280px" : "0px", 
+        width: isSidebarOpen ? (isMobile ? "100%" : "280px") : "0px", 
         backgroundColor: theme.sidebar, 
         borderRight: isSidebarOpen ? `1px solid ${theme.border}` : "none",
         display: "flex",
         flexDirection: "column",
         padding: isSidebarOpen ? "1.5rem" : "0",
-        position: "sticky",
+        position: isMobile ? "fixed" : "sticky",
         top: 0,
         height: "100vh",
-        boxShadow: isDark ? "none" : "4px 0 24px rgba(0,0,0,0.02)",
+        boxShadow: isDark || !isSidebarOpen ? "none" : "4px 0 24px rgba(0,0,0,0.02)",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         overflow: "hidden",
-        zIndex: 100
+        zIndex: 1000
       }}>
-        <div style={{ flex: 1, opacity: isSidebarOpen ? 1 : 0, transition: "opacity 0.2s", minWidth: "240px" }}>
-          <div style={{ marginBottom: "2.5rem", padding: "0.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <img 
-              src={logo} 
-              alt="GestionSTK Logo" 
-              style={{ 
-                width: "32px", 
-                height: "32px", 
-                objectFit: "contain" 
-              }} 
-            />
-            <h1 style={{ 
-              fontSize: "1.15rem", 
-              fontWeight: 800, 
-              color: theme.text,
-              letterSpacing: "-0.03em",
-              margin: 0
-            }}>
-              GestionSTK <span style={{ opacity: 0.5, fontSize: "0.7rem", verticalAlign: "top", marginLeft: "2px" }}>WEB</span>
-            </h1>
+        <div style={{ flex: 1, opacity: isSidebarOpen ? 1 : 0, transition: "opacity 0.2s", minWidth: isMobile ? "auto" : "240px" }}>
+          <div style={{ marginBottom: "2.5rem", padding: "0.5rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <img 
+                src={logo} 
+                alt="GestionSTK Logo" 
+                style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  objectFit: "contain" 
+                }} 
+              />
+              <h1 style={{ 
+                fontSize: "1.15rem", 
+                fontWeight: 800, 
+                color: theme.text,
+                letterSpacing: "-0.03em",
+                margin: 0
+              }}>
+                GestionSTK <span style={{ opacity: 0.5, fontSize: "0.7rem", verticalAlign: "top", marginLeft: "2px" }}>WEB</span>
+              </h1>
+            </div>
+            {isMobile && (
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                style={{ padding: "0.5rem", background: "none", border: "none", color: theme.text }}
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
           </div>
 
           <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -442,42 +501,42 @@ export default function DashboardHome() {
               icon={<LayoutDashboard size={19} />} 
               label="Dashboard" 
               active={activeTab === "inventory"} 
-              onClick={() => setActiveTab("inventory")}
+              onClick={() => { setActiveTab("inventory"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
             <SidebarItem 
               icon={<PackageCheck size={19} />} 
               label="RECEPCIÓN" 
               active={activeTab === "recepcion"} 
-              onClick={() => setActiveTab("recepcion")}
+              onClick={() => { setActiveTab("recepcion"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
             <SidebarItem 
               icon={<ClipboardList size={19} />} 
               label="RENDICIÓN" 
               active={activeTab === "rendicion"} 
-              onClick={() => setActiveTab("rendicion")}
+              onClick={() => { setActiveTab("rendicion"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
             <SidebarItem 
               icon={<Wallet size={19} />} 
               label="INGRESOS" 
               active={activeTab === "ingresos"} 
-              onClick={() => setActiveTab("ingresos")}
+              onClick={() => { setActiveTab("ingresos"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
             <SidebarItem 
               icon={<BarChart3 size={19} />} 
               label="ESTADÍSTICAS" 
               active={activeTab === "estadisticas"} 
-              onClick={() => setActiveTab("estadisticas")}
+              onClick={() => { setActiveTab("estadisticas"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
             <SidebarItem 
               icon={<Settings size={19} />} 
               label="Vincular Settings" 
               active={activeTab === "settings"} 
-              onClick={() => setActiveTab("settings")}
+              onClick={() => { setActiveTab("settings"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
           </nav>
@@ -563,6 +622,67 @@ export default function DashboardHome() {
       </aside>
 
       <main style={{ flex: 1, overflowY: "auto", backgroundColor: isDark ? "#0A0A0A" : "#FAFAFA", position: "relative" }}>
+        {/* Banner de Instalación PWA */}
+        {showInstallBanner && (
+          <div style={{
+            backgroundColor: theme.primary,
+            padding: "0.75rem 2rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1rem",
+            color: "black",
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            position: "sticky",
+            top: 0,
+            zIndex: 200,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            animation: "slideDown 0.5s ease-out"
+          }}>
+            <Monitor size={18} />
+            <span>¿Quieres usar el Dashboard como una aplicación de PC?</span>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button 
+                onClick={handleInstallClick}
+                style={{
+                  backgroundColor: "black",
+                  color: "white",
+                  border: "none",
+                  padding: "0.4rem 1rem",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: "0.75rem"
+                }}
+              >
+                Instalar aquí
+              </button>
+              <button 
+                onClick={() => setShowInstallBanner(false)}
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.1)",
+                  color: "black",
+                  border: "none",
+                  padding: "0.4rem 1rem",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: "0.75rem"
+                }}
+              >
+                Omitir
+              </button>
+            </div>
+            <style>{`
+              @keyframes slideDown {
+                from { transform: translateY(-100%); }
+                to { transform: translateY(0); }
+              }
+            `}</style>
+          </div>
+        )}
+
         {/* Toggle Button Container */}
         <div style={{ 
           position: "sticky", 
@@ -598,13 +718,19 @@ export default function DashboardHome() {
         <div style={{ 
           maxWidth: "1000px", 
           margin: "0 auto", 
-          padding: "1.5rem 2rem 1.5rem 3.5rem",
+          padding: isMobile ? "1.5rem 1rem 1.5rem 1rem" : "1.5rem 2rem 1.5rem 3.5rem",
           minHeight: "100%"
         }}>
           {activeTab === "inventory" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "1.5rem" }}>
-                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>
+               <header style={{ 
+                 marginBottom: "1.5rem", 
+                 flexWrap: "wrap", 
+                 gap: "1rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
+               }}>
+                <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>
                   Resumen
                 </h2>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem", marginTop: "0.5rem" }}>
@@ -614,14 +740,15 @@ export default function DashboardHome() {
                    </div>
                    <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: theme.border }} />
                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text }}>{profile?.region_asignada}</span>
-                   <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: theme.border }} />
-                   <span style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666" }}>
-                     Desde: {profile?.fecha_registro ? new Date(profile.fecha_registro).toLocaleDateString() : "N/A"}
-                   </span>
                 </div>
               </header>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", 
+                gap: "1rem", 
+                marginBottom: "2rem" 
+              }}>
                   <StatCard label="Sectores" value={stats.totalSectores} color={theme.accent} theme={theme} />
                   <StatCard label="Contactos" value={stats.totalContactos} color={theme.primary} theme={theme} />
                   <StatCard label="OF Auto deteccion" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} />
@@ -631,7 +758,7 @@ export default function DashboardHome() {
                 backgroundColor: theme.sidebar, 
                 borderRadius: "24px", 
                 border: `1px solid ${theme.border}`,
-                padding: "2rem",
+                padding: isMobile ? "1.5rem" : "2rem",
                 boxShadow: "0 10px 40px -10px rgba(0,0,0,0.05)"
               }}>
                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
@@ -662,12 +789,15 @@ export default function DashboardHome() {
                  marginBottom: "2rem", 
                  display: "flex", 
                  justifyContent: "space-between", 
-                 alignItems: "flex-end",
+                 alignItems: isMobile ? "flex-start" : "flex-end",
+                 flexDirection: isMobile ? "column" : "row",
                  flexWrap: "wrap",
-                 gap: "1.5rem"
+                 gap: "1rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
                }}>
                 <div>
-                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
+                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
                   <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Total de paquetes recibidos</p>
                 </div>
 
@@ -684,7 +814,9 @@ export default function DashboardHome() {
                     border: `1px solid ${theme.border}`,
                     boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
                     position: "relative",
-                    zIndex: 1000
+                    zIndex: 1000,
+                    width: isMobile ? "100%" : "auto",
+                    justifyContent: "space-between"
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -707,7 +839,8 @@ export default function DashboardHome() {
                         fontSize: "0.8rem", 
                         fontWeight: 700,
                         outline: "none",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        width: isMobile ? "85px" : "auto"
                       }}
                     />
                   </div>
@@ -730,16 +863,17 @@ export default function DashboardHome() {
                       fontSize: "0.8rem", 
                       fontWeight: 700, 
                       outline: "none",
-                      cursor: "pointer"
+                      cursor: "pointer",
+                      width: isMobile ? "85px" : "auto"
                     }}
                   />
                 </div>
               </header>
 
-              {/* Resumen de Recepción (UI Compacta con Datos Reales) */}
+              {/* Resumen de Recepción */}
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: "1fr 1fr 1fr", 
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", 
                 gap: "1.25rem", 
                 marginBottom: "2rem" 
               }}>
@@ -771,11 +905,12 @@ export default function DashboardHome() {
                   textAlign: "center"
                 }}>
                   <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos por tipo de OF</p>
-                  <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center" }}>
+                  <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <div style={{ textAlign: "center" }}>
                       <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
                       <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900 }}>{totals.rec_normal}</p>
                     </div>
+                    {/* ... grid separators logic ... */}
                     <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
                     <div style={{ textAlign: "center" }}>
                       <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>EXT</p>
@@ -791,15 +926,6 @@ export default function DashboardHome() {
                       <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>PXP</p>
                       <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#5856D6" }}>{totals.rec_pxp}</p>
                     </div>
-                    {Object.keys(totals.detail_custom).map(key => (
-                      <React.Fragment key={key}>
-                        <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
-                        <div style={{ textAlign: "center" }}>
-                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{getCustomLabel(key)}</p>
-                          <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].rec}</p>
-                        </div>
-                      </React.Fragment>
-                    ))}
                   </div>
                 </div>
 
@@ -827,15 +953,22 @@ export default function DashboardHome() {
                 backgroundColor: theme.sidebar, 
                 borderRadius: "28px", 
                 border: `1px solid ${theme.border}`, 
-                padding: "2rem",
+                padding: isMobile ? "1.5rem" : "2rem",
                 boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
-                height: "400px",
+                height: isMobile ? "350px" : "400px",
                 display: "flex",
                 flexDirection: "column"
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: isMobile ? "flex-start" : "center", 
+                  flexDirection: isMobile ? "column" : "row",
+                  marginBottom: "2rem",
+                  gap: "1rem"
+                }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Flujo de Paquetes por Día</h3>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", maxWidth: isMobile ? "100%" : "60%" }}>
                     {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
                       const isActive = visibleCurves.includes(type);
                       const color = curveColors[type.toLowerCase()] || curveColors.custom;
@@ -868,10 +1001,9 @@ export default function DashboardHome() {
                     })}
                   </div>
                 </div>
-
-                <div style={{ flex: 1, width: "100%" }}>
+                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorRec_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -928,12 +1060,15 @@ export default function DashboardHome() {
                  marginBottom: "2rem", 
                  display: "flex", 
                  justifyContent: "space-between", 
-                 alignItems: "flex-end",
+                 alignItems: isMobile ? "flex-start" : "flex-end",
+                 flexDirection: "row",
                  flexWrap: "wrap",
-                 gap: "1.5rem"
+                 gap: "1.5rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
                }}>
                 <div>
-                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición Operativa</h2>
+                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición Operativa</h2>
                   <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de Nomina, total entregados</p>
                 </div>
 
@@ -1005,7 +1140,7 @@ export default function DashboardHome() {
               {/* Resumen de Rendición (Datos Reales) */}
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", 
                 gap: "1rem", 
                 marginBottom: "2rem" 
               }}>
@@ -1092,15 +1227,22 @@ export default function DashboardHome() {
                 backgroundColor: theme.sidebar, 
                 borderRadius: "28px", 
                 border: `1px solid ${theme.border}`, 
-                padding: "2rem",
+                padding: isMobile ? "1.5rem" : "2rem",
                 boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
-                height: "400px",
+                height: isMobile ? "350px" : "400px",
                 display: "flex",
                 flexDirection: "column"
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: isMobile ? "flex-start" : "center", 
+                  flexDirection: isMobile ? "column" : "row",
+                  marginBottom: "2rem",
+                  gap: "1rem"
+                }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Rendimiento de Entrega</h3>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", maxWidth: isMobile ? "100%" : "60%" }}>
                     {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
                       const isActive = visibleCurves.includes(type);
                       const color = curveColors[type.toLowerCase()] || curveColors.custom;
@@ -1134,9 +1276,9 @@ export default function DashboardHome() {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, width: "100%" }}>
+                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorEnt_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -1192,12 +1334,15 @@ export default function DashboardHome() {
                  marginBottom: "2rem", 
                  display: "flex", 
                  justifyContent: "space-between", 
-                 alignItems: "flex-end",
+                 alignItems: isMobile ? "flex-start" : "flex-end",
+                 flexDirection: isMobile ? "column" : "row",
                  flexWrap: "wrap",
-                 gap: "1.5rem"
+                 gap: "1.5rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
                }}>
                 <div>
-                  <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Gestión de Ingresos</h2>
+                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Gestión de Ingresos</h2>
                   <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Tarifas activas sincronizadas desde la App</p>
                 </div>
 
@@ -1214,7 +1359,9 @@ export default function DashboardHome() {
                     border: `1px solid ${theme.border}`,
                     boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
                     position: "relative",
-                    zIndex: 1000
+                    zIndex: 1000,
+                    width: isMobile ? "100%" : "auto",
+                    justifyContent: "space-between"
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1237,7 +1384,8 @@ export default function DashboardHome() {
                         fontSize: "0.8rem", 
                         fontWeight: 700,
                         outline: "none",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        width: isMobile ? "85px" : "auto"
                       }}
                     />
                   </div>
@@ -1260,7 +1408,8 @@ export default function DashboardHome() {
                       fontSize: "0.8rem", 
                       fontWeight: 700, 
                       outline: "none",
-                      cursor: "pointer"
+                      cursor: "pointer",
+                      width: isMobile ? "85px" : "auto"
                     }}
                   />
                 </div>
@@ -1279,15 +1428,22 @@ export default function DashboardHome() {
                 backgroundColor: theme.sidebar, 
                 borderRadius: "28px", 
                 border: `1px solid ${theme.border}`, 
-                padding: "2rem",
+                padding: isMobile ? "1.5rem" : "2rem",
                 boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
-                height: "350px",
+                height: isMobile ? "350px" : "350px",
                 display: "flex",
                 flexDirection: "column"
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: isMobile ? "flex-start" : "center", 
+                  flexDirection: isMobile ? "column" : "row",
+                  marginBottom: "2rem",
+                  gap: "1rem"
+                }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Historial de Liquidación</h3>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", maxWidth: isMobile ? "100%" : "60%" }}>
                     {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
                       const isActive = visibleCurves.includes(type);
                       const color = curveColors[type.toLowerCase()] || curveColors.custom;
@@ -1321,9 +1477,9 @@ export default function DashboardHome() {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, width: "100%" }}>
+                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorIng_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -1376,8 +1532,12 @@ export default function DashboardHome() {
 
           {activeTab === "estadisticas" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "2rem" }}>
-                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Estadísticas</h2>
+               <header style={{ 
+                 marginBottom: "2rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
+               }}>
+                <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Estadísticas</h2>
                 <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Análisis de rendimiento y KPIs operativos</p>
               </header>
               <div style={{ padding: "4rem", textAlign: "center", backgroundColor: theme.sidebar, borderRadius: "24px", border: `1px solid ${theme.border}` }}>
@@ -1390,9 +1550,13 @@ export default function DashboardHome() {
 
           {activeTab === "settings" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ marginBottom: "3rem" }}>
-                <h2 style={{ fontSize: "2.25rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Vincular Settings</h2>
-                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem", fontSize: "1.05rem" }}>Sincroniza tus preferencias con la aplicación móvil</p>
+               <header style={{ 
+                 marginBottom: "3rem",
+                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                 transition: "padding 0.3s"
+               }}>
+                <h2 style={{ fontSize: isMobile ? "1.8rem" : "2.25rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Vincular Settings</h2>
+                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem", fontSize: isMobile ? "0.95rem" : "1.05rem" }}>Sincroniza tus preferencias con la aplicación móvil</p>
               </header>
               <div style={{ 
                 backgroundColor: theme.sidebar, 

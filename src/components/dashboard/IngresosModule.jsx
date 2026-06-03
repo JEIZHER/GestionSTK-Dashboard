@@ -179,22 +179,22 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
   return (
     <div className="space-y-4">
       {/* Grid Principal */}
-      <div className="flex gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
         {/* KPI de Gestión */}
-        <div className="w-[85px] bg-[#FBFF00] p-2 rounded-[18px] shadow-sm flex flex-col justify-center items-center text-black border border-black/5 shrink-0">
-          <p className="text-[8px] font-black uppercase tracking-tighter opacity-70">KPI</p>
+        <div className="bg-[#FBFF00] p-4 rounded-[18px] shadow-sm flex flex-row md:flex-col justify-between md:justify-center items-center text-black border border-black/5 shrink-0 min-w-full md:min-w-[100px] md:h-auto">
+          <p className="text-[10px] md:text-[8px] font-black uppercase tracking-tighter opacity-70">KPI Gestión</p>
           <div className="flex items-baseline">
-            <span className="text-3xl font-black leading-none">{data.cuenta?.kpi || '0'}</span>
-            <span className="text-[11px] font-bold">%</span>
+            <span className="text-4xl md:text-3xl font-black leading-none">{data.cuenta?.kpi || '0'}</span>
+            <span className="text-[13px] md:text-[11px] font-bold">%</span>
           </div>
         </div>
 
         {/* Tarifas y Precios */}
         <div className="flex-1 bg-white p-4 rounded-[20px] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-2">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0">Tarifario de Servicios (Base / Con KPI)</p>
             {Number(data.cuenta?.piso) > 0 && (
-              <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 uppercase tracking-widest">
+              <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 uppercase tracking-widest w-fit">
                 Base Diaria: {formatCurrency(data.cuenta?.piso)}
               </span>
             )}
@@ -233,18 +233,18 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
       </div>
 
       {/* Recaudación Proyectada Real */}
-      <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-sm flex justify-between items-center">
+      <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 text-blue-600">Recaudación Final Acumulada</p>
+          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Recaudación Final Acumulada</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-gray-900">{formatCurrency(totalIngresos)}</span>
+            <span className="text-3xl md:text-3xl font-black text-gray-900">{formatCurrency(totalIngresos)}</span>
             <span className="text-green-500 text-[10px] font-bold flex items-center gap-1">
               <TrendingUp size={10}/> Real
             </span>
           </div>
           <p className="text-[9px] text-gray-400 mt-1 italic">Calculado sobre {data.rendiciones.length} rendiciones diarias</p>
         </div>
-        <div className="h-14 w-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-200">
+        <div className="h-14 w-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-200 self-end md:self-center">
           <DollarSign size={24} className="text-[#FBFF00]" />
         </div>
       </div>
