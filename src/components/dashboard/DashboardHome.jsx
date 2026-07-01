@@ -36,6 +36,8 @@ export default function DashboardHome() {
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
+  const [cuentaHistorial, setCuentaHistorial] = useState([]);
+  // Kept for display purposes — the latest record
   const [cuenta, setCuenta] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -50,6 +52,7 @@ export default function DashboardHome() {
   const [visibleCurves, setVisibleCurves] = useState(['total']);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [recentActivity, setRecentActivity] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -272,6 +275,20 @@ export default function DashboardHome() {
     detail_custom: {} 
   });
 
+  // Returns the cuenta record that was active on a given date (YYYY-MM-DD)
+  const getHistoricalCuenta = (fecha) => {
+    if (!cuentaHistorial || cuentaHistorial.length === 0) return cuenta;
+    // Find the last record whose created_at is <= the rendition date
+    const dateTs = new Date(fecha + 'T23:59:59').getTime();
+    let active = null;
+    for (const c of cuentaHistorial) {
+      const cTs = new Date(c.created_at).getTime();
+      if (cTs <= dateTs) active = c;
+    }
+    // Fallback to the earliest known record if no historical match
+    return active || cuentaHistorial[0] || cuenta;
+  };
+
   const chartData = stats.rendiciones.length > 0 
     ? stats.rendiciones.map(r => {
         let recCustom = 0; let entCustom = 0; let ingCustom = 0;
@@ -285,7 +302,8 @@ export default function DashboardHome() {
             recCustom += (item.rec || 0);
             entCustom += (item.ent || 0);
 
-            const config = parseTarifasCustom(cuenta?.tarifas_custom)?.find(t => t.nombre === key || t.label === key);
+            const hc = getHistoricalCuenta(r.fecha);
+            const config = parseTarifasCustom(hc?.tarifas_custom)?.find(t => t.nombre === key || t.label === key);
             let itemIng = 0;
             if (config && item.ent > 0) {
               const price = (config.depende_kpi && kpiLogrado) ? (config.con_kpi || 0) : (config.base || 0);
@@ -298,11 +316,12 @@ export default function DashboardHome() {
             customBreakdown[`ing_${label}`] = itemIng;
           });
         }
-        
-        const c_kpiCte = cuenta?.kpi_cte || 0; const c_cte = cuenta?.pago_nacional || 0;
-        const c_kpiExt = cuenta?.kpi_ext || 0; const c_ext = cuenta?.pago_extranjero || 0;
-        const c_kpiCod = cuenta?.kpi_cod || 0; const c_cod = cuenta?.pago_cod || 0;
-        const c_kpiPxp = cuenta?.kpi_pxp || 0; const c_pxp = cuenta?.pago_pxp || 0;
+
+        const hc = getHistoricalCuenta(r.fecha);
+        const c_kpiCte = hc?.kpi_cte || 0; const c_cte = hc?.pago_nacional || 0;
+        const c_kpiExt = hc?.kpi_ext || 0; const c_ext = hc?.pago_extranjero || 0;
+        const c_kpiCod = hc?.kpi_cod || 0; const c_cod = hc?.pago_cod || 0;
+        const c_kpiPxp = hc?.kpi_pxp || 0; const c_pxp = hc?.pago_pxp || 0;
 
         const ingCte = (r.ent_cte || 0) * (kpiLogrado ? c_kpiCte : c_cte);
         const ingExt = (r.ent_ext || 0) * (kpiLogrado ? c_kpiExt : c_ext);
@@ -310,7 +329,11 @@ export default function DashboardHome() {
         const ingPxp = (r.ent_pxp || 0) * (kpiLogrado ? c_kpiPxp : c_pxp);
 
         return {
-          name: new Date(r.fecha).toLocaleDateString('es-CL', { weekday: 'short' }),
+          name: (() => {
+             const [year, month, day] = (r.fecha || '').split('T')[0].split('-');
+             if (!year || !month || !day) return 'Sin fecha';
+             return new Date(year, month - 1, day).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+          })(),
           
           rec_total: (r.rec_cte||0) + (r.rec_ext||0) + (r.rec_cod||0) + (r.rec_pxp||0) + recCustom,
           rec_cte: r.rec_cte || 0,
@@ -357,14 +380,17 @@ export default function DashboardHome() {
         const cleanProfile = { ...profileData, region_asignada: cleanRegion };
         setProfile(cleanProfile);
 
-        const { data: cuentaData, error: cuentaError } = await supabase
+        const { data: cuentaHistorialData, error: cuentaError } = await supabase
           .from("cuenta")
           .select("*")
           .eq("auth_id", user.id)
-          .single();
+          .order("created_at", { ascending: true });
 
         if (cuentaError && cuentaError.code !== "PGRST116") throw cuentaError;
-        setCuenta(cuentaData || null);
+        const historial = cuentaHistorialData || [];
+        setCuentaHistorial(historial);
+        // The last record is the currently active one (for display cards, etc.)
+        setCuenta(historial.length > 0 ? historial[historial.length - 1] : null);
 
         // 2. Fetch Count Sectores
         const { count: sectoresCount } = await supabase
@@ -397,6 +423,46 @@ export default function DashboardHome() {
           .order("fecha", { ascending: true });
 
         if (rendError) throw rendError;
+
+        // 6. Fetch recent activity (Actividad Reciente) independent of date filter
+        const { data: recentRendiciones } = await supabase
+          .from("rendiciones_diarias")
+          .select("fecha, created_at, id")
+          .eq("auth_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        const { data: recentPrecision } = await supabase
+          .from("reportes_precision")
+          .select("fecha, created_at, id")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        const mapActivity = new Map();
+        
+        (recentRendiciones || []).forEach(r => {
+           if(!mapActivity.has(r.fecha)) mapActivity.set(r.fecha, { fecha: r.fecha, rendicion: r, precision: null });
+           else mapActivity.get(r.fecha).rendicion = r;
+        });
+        
+        (recentPrecision || []).forEach(p => {
+           if(!mapActivity.has(p.fecha)) mapActivity.set(p.fecha, { fecha: p.fecha, rendicion: null, precision: p });
+           else mapActivity.get(p.fecha).precision = p;
+        });
+
+        const recentActivityRaw = Array.from(mapActivity.values())
+          .map(item => ({
+            ...item,
+            maxTime: new Date(Math.max(
+              item.rendicion ? new Date(item.rendicion.created_at).getTime() : 0,
+              item.precision ? new Date(item.precision.created_at).getTime() : 0
+            ))
+          }))
+          .sort((a, b) => b.maxTime - a.maxTime)
+          .slice(0, 3);
+          
+        setRecentActivity(recentActivityRaw);
 
         setStats({
           totalSectores: sectoresCount || 0,
@@ -716,7 +782,7 @@ export default function DashboardHome() {
         </div>
 
         <div style={{ 
-          maxWidth: "1000px", 
+          maxWidth: "1300px", 
           margin: "0 auto", 
           padding: isMobile ? "1.5rem 1rem 1.5rem 1rem" : "1.5rem 2rem 1.5rem 3.5rem",
           minHeight: "100%"
@@ -765,20 +831,138 @@ export default function DashboardHome() {
                     <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800 }}>Actividad Reciente</h3>
                     <button style={{ color: theme.accent, fontSize: "0.8rem", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>Ver todo</button>
                  </div>
-                 <div style={{ color: isDark ? "#555" : "#AAA", textAlign: "center", padding: "4rem 0" }}>
-                    <img 
-                      src={logo} 
-                      alt="Empty" 
-                      style={{ 
-                        width: "48px", 
-                        height: "48px", 
-                        marginBottom: "1rem", 
-                        opacity: 0.25,
-                        filter: isDark ? "grayscale(1) brightness(2)" : "grayscale(1)"
-                      }} 
-                    />
-                    <p style={{ fontSize: "0.9rem" }}>No hay movimientos registrados en la última hora</p>
-                 </div>
+                 
+                 {/* Tarifa change notes from last 5 days */}
+                 {(() => {
+                   const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+                   const now = Date.now();
+                   const LABELS = {
+                     kpi: 'KPI',
+                     pago_nacional: 'Nacional (base)',
+                     kpi_cte: 'Nacional (KPI)',
+                     pago_extranjero: 'EXT (base)',
+                     kpi_ext: 'EXT (KPI)',
+                     pago_cod: 'COD (base)',
+                     kpi_cod: 'COD (KPI)',
+                     pago_pxp: 'PxP (base)',
+                     kpi_pxp: 'PxP (KPI)',
+                   };
+                   const changes = [];
+                   for (let i = 1; i < cuentaHistorial.length; i++) {
+                     const curr = cuentaHistorial[i];
+                     const prev = cuentaHistorial[i - 1];
+                     const ts = new Date(curr.created_at).getTime();
+                     if (now - ts > FIVE_DAYS_MS) continue;
+                     const diffs = [];
+                     Object.keys(LABELS).forEach(field => {
+                       const vPrev = prev[field]; const vCurr = curr[field];
+                       if (String(vPrev) !== String(vCurr)) {
+                         diffs.push(`${LABELS[field]}: ${vPrev ?? '-'} → ${vCurr ?? '-'}`);
+                       }
+                     });
+                     // Check custom tariffs
+                     const prevCustom = JSON.stringify(prev.tarifas_custom);
+                     const currCustom = JSON.stringify(curr.tarifas_custom);
+                     if (prevCustom !== currCustom) diffs.push('Tarifas custom modificadas');
+                     if (diffs.length > 0) {
+                       const d = new Date(curr.created_at);
+                       changes.push({ ts: d, diffs });
+                     }
+                   }
+                   if (changes.length === 0) return null;
+                   return changes.map((ch, idx) => (
+                     <div key={`tc_${idx}`} style={{
+                       padding: '1rem',
+                       backgroundColor: isDark ? 'rgba(94,92,230,0.07)' : '#F0EFFE',
+                       borderRadius: '12px',
+                       borderLeft: '4px solid #5E5CE6',
+                       marginBottom: '1rem'
+                     }}>
+                       <p style={{ margin: '0 0 0.35rem', fontWeight: 700, fontSize: '0.9rem', color: '#5E5CE6' }}>
+                         ⚙️ Ajuste de tarifas
+                       </p>
+                       <p style={{ margin: '0 0 0.4rem', fontSize: '0.78rem', color: isDark ? '#888' : '#666' }}>
+                         {ch.ts.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' })} a las {ch.ts.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                       </p>
+                       {ch.diffs.map((d, j) => (
+                         <span key={j} style={{
+                           display: 'inline-block',
+                           fontSize: '0.75rem',
+                           fontWeight: 600,
+                           backgroundColor: isDark ? 'rgba(94,92,230,0.15)' : '#E0DEFF',
+                           color: isDark ? '#A89FF5' : '#3634A3',
+                           padding: '0.2rem 0.5rem',
+                           borderRadius: '6px',
+                           margin: '0.15rem 0.2rem 0 0'
+                         }}>{d}</span>
+                       ))}
+                     </div>
+                   ));
+                 })()}
+
+                 {recentActivity.length === 0 ? (
+                   <div style={{ color: isDark ? "#555" : "#AAA", textAlign: "center", padding: "4rem 0" }}>
+                      <img 
+                        src={logo} 
+                        alt="Empty" 
+                        style={{ 
+                          width: "48px", 
+                          height: "48px", 
+                          marginBottom: "1rem", 
+                          opacity: 0.25,
+                          filter: isDark ? "grayscale(1) brightness(2)" : "grayscale(1)"
+                        }} 
+                      />
+                      <p style={{ fontSize: "0.9rem" }}>No hay movimientos registrados recientes</p>
+                   </div>
+                 ) : (
+                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                     {recentActivity.map((act, i) => {
+                       const status = (act.rendicion && act.precision) ? "ok" : "warning";
+                       const timeStr = act.maxTime.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                       const createdDateStr = act.maxTime.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                       const dateStr = (() => {
+                         const [y, m, d] = (act.fecha || '').split('T')[0].split('-');
+                         if (!y || !m || !d) return act.fecha;
+                         return new Date(y, m - 1, d).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                       })();
+                       
+                       return (
+                         <div key={i} style={{ 
+                           display: "flex", 
+                           alignItems: "center", 
+                           justifyContent: "space-between",
+                           padding: "1rem",
+                           backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA",
+                           borderRadius: "12px",
+                           borderLeft: `4px solid ${status === "ok" ? "#34C759" : "#FF9500"}`
+                         }}>
+                           <div>
+                             <p style={{ margin: "0 0 0.25rem", fontWeight: 700, fontSize: "0.95rem" }}>
+                               Día reportado: {dateStr}
+                             </p>
+                             <p style={{ margin: 0, fontSize: "0.8rem", color: isDark ? "#888" : "#666" }}>
+                               Registrado el {createdDateStr} a las {timeStr}
+                             </p>
+                           </div>
+                           <div style={{ textAlign: "right" }}>
+                             {status === "ok" ? (
+                               <span style={{ fontSize: "0.8rem", color: "#34C759", fontWeight: 700, backgroundColor: isDark ? "rgba(52, 199, 89, 0.1)" : "#E8F8EE", padding: "0.3rem 0.6rem", borderRadius: "8px" }}>Completado</span>
+                             ) : (
+                               <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", alignItems: "flex-end" }}>
+                                 <span style={{ fontSize: "0.8rem", color: "#FF9500", fontWeight: 700, backgroundColor: isDark ? "rgba(255, 149, 0, 0.1)" : "#FFF4E5", padding: "0.3rem 0.6rem", borderRadius: "8px" }}>Incompleto</span>
+                                 <span style={{ fontSize: "0.7rem", color: isDark ? "#888" : "#999" }}>
+                                   {(!act.rendicion) && "Falta Rendición Diaria"}
+                                   {(!act.precision) && "Falta Reporte Precisión"}
+                                 </span>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
               </div>
             </div>
           )}
@@ -1003,7 +1187,7 @@ export default function DashboardHome() {
                 </div>
                 <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorRec_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -1013,7 +1197,7 @@ export default function DashboardHome() {
                         ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
-                      <XAxis 
+                      <XAxis angle={-45} textAnchor="end" height={80} 
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
@@ -1021,9 +1205,11 @@ export default function DashboardHome() {
                         dy={10}
                       />
                       <YAxis 
+                        width={60}
                         axisLine={false} 
                         tickLine={false} 
                         tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        tickFormatter={(val) => new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(val)}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -1278,7 +1464,7 @@ export default function DashboardHome() {
 
                 <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorEnt_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -1288,7 +1474,7 @@ export default function DashboardHome() {
                         ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
-                      <XAxis 
+                      <XAxis angle={-45} textAnchor="end" height={80} 
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
@@ -1296,9 +1482,11 @@ export default function DashboardHome() {
                         dy={10}
                       />
                       <YAxis 
+                        width={60}
                         axisLine={false} 
                         tickLine={false} 
                         tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        tickFormatter={(val) => new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(val)}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -1479,7 +1667,7 @@ export default function DashboardHome() {
 
                 <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
                           <linearGradient key={type} id={`colorIng_${type}`} x1="0" y1="0" x2="0" y2="1">
@@ -1489,7 +1677,7 @@ export default function DashboardHome() {
                         ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
-                      <XAxis 
+                      <XAxis angle={-45} textAnchor="end" height={80} 
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
@@ -1497,9 +1685,11 @@ export default function DashboardHome() {
                         dy={10}
                       />
                       <YAxis 
+                        width={80}
                         axisLine={false} 
                         tickLine={false} 
                         tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
+                        tickFormatter={(val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', notation: 'compact' }).format(val)}
                       />
                       <Tooltip 
                         formatter={(val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val)}

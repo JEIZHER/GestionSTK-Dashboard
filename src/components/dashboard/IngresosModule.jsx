@@ -20,13 +20,15 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
       
       // Si ya tenemos las rendiciones desde el padre, solo buscamos la cuenta
       try {
-        const { data: cuentaData, error: cuentaError } = await supabase
+        const { data: cuentaHistorialData, error: cuentaError } = await supabase
           .from('cuenta')
           .select('*')
           .eq('auth_id', user.id)
-          .single();
+          .order('created_at', { ascending: true });
         
         if (cuentaError && cuentaError.code !== 'PGRST116') throw cuentaError;
+        const historial = cuentaHistorialData || [];
+        const latestCuenta = historial.length > 0 ? historial[historial.length - 1] : null;
 
         const aggregateRendicionesByFecha = rows => {
           const map = new Map();
@@ -123,7 +125,8 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
         }
 
         setData({
-          cuenta: cuentaData,
+          cuenta: latestCuenta,
+          cuentaHistorial: historial,
           rendiciones: aggregateRendicionesByFecha(rendData || []),
           loading: false
         });
@@ -139,28 +142,37 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
   const calculateEarnings = () => {
     if (!data.cuenta || data.rendiciones.length === 0) return 0;
     
-    const { rendiciones } = data;
+    const { rendiciones, cuentaHistorial } = data;
     let total = 0;
 
+    // Returns the cuenta record that was active on a given date
+    const getHistoricalCuenta = (fecha) => {
+      if (!cuentaHistorial || cuentaHistorial.length === 0) return data.cuenta;
+      const dateTs = new Date(fecha + 'T23:59:59').getTime();
+      let active = null;
+      for (const c of cuentaHistorial) {
+        if (new Date(c.created_at).getTime() <= dateTs) active = c;
+      }
+      return active || cuentaHistorial[0] || data.cuenta;
+    };
+
     rendiciones.forEach(r => {
-      // Determinamos si este día el KPI fue logrado (o fallback a lo que diga la cuenta globalmente)
-      const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : (data.cuenta.kpi >= 95);
+      const hc = getHistoricalCuenta(r.fecha);
+      const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : (hc.kpi >= 95);
 
       // 1. Ingresos Standard (Basados en KPI)
-      // Si se logró el KPI, usamos la tarifa de incentivo (kpi_xxx), si no la base (pago_xxx)
-      total += (r.ent_cte || 0) * (kpiLogrado ? (data.cuenta.kpi_cte || 0) : (data.cuenta.pago_nacional || 0));
-      total += (r.ent_ext || 0) * (kpiLogrado ? (data.cuenta.kpi_ext || 0) : (data.cuenta.pago_extranjero || 0));
-      total += (r.ent_cod || 0) * (kpiLogrado ? (data.cuenta.kpi_cod || 0) : (data.cuenta.pago_cod || 0));
-      total += (r.ent_pxp || 0) * (kpiLogrado ? (data.cuenta.kpi_pxp || 0) : (data.cuenta.pago_pxp || 0));
+      total += (r.ent_cte || 0) * (kpiLogrado ? (hc.kpi_cte || 0) : (hc.pago_nacional || 0));
+      total += (r.ent_ext || 0) * (kpiLogrado ? (hc.kpi_ext || 0) : (hc.pago_extranjero || 0));
+      total += (r.ent_cod || 0) * (kpiLogrado ? (hc.kpi_cod || 0) : (hc.pago_cod || 0));
+      total += (r.ent_pxp || 0) * (kpiLogrado ? (hc.kpi_pxp || 0) : (hc.pago_pxp || 0));
 
-      // 2. Custom Tariffs logic
+      // 2. Custom Tariffs
       if (r.datos_custom && typeof r.datos_custom === 'object') {
         Object.keys(r.datos_custom).forEach(key => {
-          const stats = r.datos_custom[key]; // { rec, ent, dev }
-          const config = data.cuenta.tarifas_custom?.find(t => t.nombre === key || t.label === key);
+          const stats = r.datos_custom[key];
+          const config = hc.tarifas_custom?.find(t => t.nombre === key || t.label === key);
           
           if (config && stats.ent > 0) {
-            // Si depende del KPI y se logró, usamos con_kpi, si no base
             const price = (config.depende_kpi && kpiLogrado) ? (config.con_kpi || 0) : (config.base || 0);
             total += stats.ent * price;
           }
