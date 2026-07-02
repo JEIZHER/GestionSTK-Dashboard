@@ -267,7 +267,11 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
         <div style={{ padding: '1rem', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Editar Actividad</h2>
-            <p style={{ margin: '0.1rem 0 0', fontSize: '0.85rem', color: theme.accent }}>{activity?.fecha}</p>
+            <p style={{ margin: '0.1rem 0 0', fontSize: '0.85rem', color: theme.accent }}>{(() => {
+              const [y, m, d] = (activity?.fecha || '').split('T')[0].split('-');
+              if (!y || !m || !d) return activity?.fecha;
+              return new Date(y, m - 1, d).toLocaleDateString();
+            })()}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.text, cursor: 'pointer', padding: '0.2rem' }}>
             <X size={24} />
@@ -356,48 +360,50 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                        onChange={e => handleRendicionChange('kpi_logrado', e.target.checked)}
                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                      />
-                  </div>
-
-                  {['cte', 'ext', 'cod', 'pxp'].map((tipo) => (
-                    <div key={tipo}>
-                      <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase' }}>Pago {tipo === 'cte' ? 'Nacional' : tipo}</h4>
-                      <div style={sectionStyle}>
-                        <div>
-                          <label htmlFor={`rec_${tipo}`} style={labelStyle}>Recibidos</label>
-                          <input id={`rec_${tipo}`} name={`rec_${tipo}`} type="number" value={rendicionData[`rec_${tipo}`]} onChange={e => handleRendicionChange(`rec_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                        <div>
-                          <label htmlFor={`ent_${tipo}`} style={labelStyle}>Entregados</label>
-                          <input id={`ent_${tipo}`} name={`ent_${tipo}`} type="number" value={rendicionData[`ent_${tipo}`]} onChange={e => handleRendicionChange(`ent_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                        <div>
-                          <label htmlFor={`dev_${tipo}`} style={labelStyle}>Devueltos</label>
-                          <input id={`dev_${tipo}`} name={`dev_${tipo}`} type="number" value={rendicionData[`dev_${tipo}`]} onChange={e => handleRendicionChange(`dev_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Campos Custom */}
-                  {Object.keys(rendicionData.datos_custom || {}).map(key => (
-                    <div key={key}>
-                      <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.9rem', fontWeight: 700 }}>{key} (Custom)</h4>
-                      <div style={sectionStyle}>
-                        <div>
-                          <label htmlFor={`rec_custom_${key}`} style={labelStyle}>Recibidos</label>
-                          <input id={`rec_custom_${key}`} name={`rec_custom_${key}`} type="number" value={rendicionData.datos_custom[key].rec || 0} onChange={e => handleCustomDataChange(key, 'rec', parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                        <div>
-                          <label htmlFor={`ent_custom_${key}`} style={labelStyle}>Entregados</label>
-                          <input id={`ent_custom_${key}`} name={`ent_custom_${key}`} type="number" value={rendicionData.datos_custom[key].ent || 0} onChange={e => handleCustomDataChange(key, 'ent', parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                        <div>
-                          <label htmlFor={`dev_custom_${key}`} style={labelStyle}>Devueltos</label>
-                          <input id={`dev_custom_${key}`} name={`dev_custom_${key}`} type="number" value={rendicionData.datos_custom[key].dev || 0} onChange={e => handleCustomDataChange(key, 'dev', parseInt(e.target.value)||0)} style={inputStyle} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              </div>
+              <div style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc', padding: '1rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: '0.5rem', fontSize: '0.75rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 800 }}>TIPO OF</th>
+                      <th style={{ padding: '0.5rem', fontSize: '0.75rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 800 }}>RECIBIDOS</th>
+                      <th style={{ padding: '0.5rem', fontSize: '0.75rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 800 }}>ENTREGADOS</th>
+                      <th style={{ padding: '0.5rem', fontSize: '0.75rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 800 }}>DEVUELTOS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {['cte', 'ext', 'cod', 'pxp'].map((tipo) => (
+                      <tr key={tipo} style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}` }}>
+                        <td style={{ padding: '0.5rem', fontWeight: 700, fontSize: '0.85rem' }}>{tipo.toUpperCase()}</td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`rec_${tipo}`} name={`rec_${tipo}`} type="number" value={rendicionData[`rec_${tipo}`]} onChange={e => handleRendicionChange(`rec_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Recibidos ${tipo}`} />
+                        </td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`ent_${tipo}`} name={`ent_${tipo}`} type="number" value={rendicionData[`ent_${tipo}`]} onChange={e => handleRendicionChange(`ent_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Entregados ${tipo}`} />
+                        </td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`dev_${tipo}`} name={`dev_${tipo}`} type="number" value={rendicionData[`dev_${tipo}`]} onChange={e => handleRendicionChange(`dev_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Devueltos ${tipo}`} />
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Campos Custom */}
+                    {Object.keys(rendicionData.datos_custom || {}).map(key => (
+                      <tr key={key} style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}` }}>
+                        <td style={{ padding: '0.5rem', fontWeight: 700, fontSize: '0.85rem' }}>{key.toUpperCase()}</td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`rec_custom_${key}`} name={`rec_custom_${key}`} type="number" value={rendicionData.datos_custom[key].rec || 0} onChange={e => handleCustomDataChange(key, 'rec', parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Recibidos ${key}`} />
+                        </td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`ent_custom_${key}`} name={`ent_custom_${key}`} type="number" value={rendicionData.datos_custom[key].ent || 0} onChange={e => handleCustomDataChange(key, 'ent', parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Entregados ${key}`} />
+                        </td>
+                        <td style={{ padding: '0.5rem' }}>
+                          <input id={`dev_custom_${key}`} name={`dev_custom_${key}`} type="number" value={rendicionData.datos_custom[key].dev || 0} onChange={e => handleCustomDataChange(key, 'dev', parseInt(e.target.value)||0)} style={inputStyle} aria-label={`Devueltos ${key}`} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

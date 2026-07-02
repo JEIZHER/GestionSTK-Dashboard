@@ -182,7 +182,12 @@ export default function DashboardHome() {
         datos_custom: {},
         _total_rec: 0,
         _total_ent: 0,
+        kpi_logrado: undefined,
       };
+
+      if (r.kpi_logrado !== undefined && r.kpi_logrado !== null) {
+        existing.kpi_logrado = r.kpi_logrado;
+      }
 
       existing.rec_cte += (r.rec_cte || 0);
       existing.ent_cte += (r.ent_cte || 0);
@@ -235,7 +240,7 @@ export default function DashboardHome() {
         const kpiActual = totalRec > 0 ? (totalEnt / totalRec) * 100 : 0;
         return {
           ...item,
-          kpi_logrado: kpiActual >= 95,
+          kpi_logrado: item.kpi_logrado !== undefined ? item.kpi_logrado : (kpiActual >= 95),
         };
       })
       .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
@@ -327,10 +332,10 @@ export default function DashboardHome() {
         const c_kpiCod = hc?.kpi_cod || 0; const c_cod = hc?.pago_cod || 0;
         const c_kpiPxp = hc?.kpi_pxp || 0; const c_pxp = hc?.pago_pxp || 0;
 
-        const ingCte = (r.ent_cte || 0) * (kpiLogrado ? c_kpiCte : c_cte);
-        const ingExt = (r.ent_ext || 0) * (kpiLogrado ? c_kpiExt : c_ext);
-        const ingCod = (r.ent_cod || 0) * (kpiLogrado ? c_kpiCod : c_cod);
-        const ingPxp = (r.ent_pxp || 0) * (kpiLogrado ? c_kpiPxp : c_pxp);
+        const ingCte = (r.ent_cte || 0) * (Number(c_kpiCte) > 0 ? (kpiLogrado ? Number(c_kpiCte) : Number(c_cte)) : Number(c_cte));
+        const ingExt = (r.ent_ext || 0) * (Number(c_kpiExt) > 0 ? (kpiLogrado ? Number(c_kpiExt) : Number(c_ext)) : Number(c_ext));
+        const ingCod = (r.ent_cod || 0) * (Number(c_kpiCod) > 0 ? (kpiLogrado ? Number(c_kpiCod) : Number(c_cod)) : Number(c_cod));
+        const ingPxp = (r.ent_pxp || 0) * (Number(c_kpiPxp) > 0 ? (kpiLogrado ? Number(c_kpiPxp) : Number(c_pxp)) : Number(c_pxp));
 
         return {
           name: (() => {
@@ -609,7 +614,7 @@ export default function DashboardHome() {
           paddingTop: "1.5rem",
           display: "flex",
           flexDirection: "column",
-          gap: "0.75rem"
+          gap: "0.5rem"
         }}>
             <div style={{ 
               display: "flex", 
@@ -793,7 +798,7 @@ export default function DashboardHome() {
                  transition: "padding 0.3s"
                }}>
                 <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>
-                  Resumen
+                  Dashboard
                 </h2>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem", marginTop: "0.5rem" }}>
                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: theme.accent, fontSize: "0.85rem", fontWeight: 800 }}>
@@ -880,10 +885,10 @@ export default function DashboardHome() {
                        borderLeft: '4px solid #5E5CE6',
                        marginBottom: '1rem'
                      }}>
-                       <p style={{ margin: '0 0 0.35rem', fontWeight: 700, fontSize: '0.9rem', color: '#5E5CE6' }}>
+                       <p style={{ margin: '0 0 0.35rem', fontWeight: 700, fontSize: "0.9rem", color: '#5E5CE6' }}>
                          ⚙️ Ajuste de tarifas
                        </p>
-                       <p style={{ margin: '0 0 0.4rem', fontSize: '0.78rem', color: isDark ? '#888' : '#666' }}>
+                       <p style={{ margin: '0 0 0.4rem', fontSize: "0.78rem", color: isDark ? '#888' : '#666' }}>
                          {ch.ts.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' })} a las {ch.ts.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                        </p>
                        {ch.diffs.map((d, j) => (
@@ -926,11 +931,11 @@ export default function DashboardHome() {
                      overflowY: showAllActivity ? "auto" : "visible",
                      paddingRight: showAllActivity ? "0.5rem" : "0"
                    }}>
-                     {recentActivity.slice(0, showAllActivity ? 30 : 3).map((act, i) => {
+                     {recentActivity.slice(0, showAllActivity ? 30 : 7).map((act, i) => {
                        const status = (act.rendicion && act.precision) ? "ok" : "warning";
                        const createdAt = new Date(act.rendicion?.created_at || act.precision?.created_at || act.fecha);
-                       const timeStr = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-                       const createdDateStr = createdAt.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                       const createdTimeStr = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                       const createdShortDate = createdAt.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
                        const dateStr = (() => {
                          const [y, m, d] = (act.fecha || '').split('T')[0].split('-');
                          if (!y || !m || !d) return act.fecha;
@@ -953,7 +958,7 @@ export default function DashboardHome() {
                              display: "flex", 
                              alignItems: "center", 
                              justifyContent: "space-between",
-                             padding: "1rem",
+                             padding: "0.6rem 1rem",
                              backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA",
                              borderRadius: "12px",
                              borderLeft: `4px solid ${status === "ok" ? "#34C759" : "#FF9500"}`,
@@ -964,12 +969,10 @@ export default function DashboardHome() {
                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA"}
                          >
                            <div>
-                             <p style={{ margin: "0 0 0.25rem", fontWeight: 700, fontSize: "0.95rem" }}>
-                               Día reportado: {dateStr}
-                             </p>
-                             <p style={{ margin: 0, fontSize: "0.8rem", color: isDark ? "#888" : "#666" }}>
-                               Registrado el {createdDateStr} a las {timeStr}
-                             </p>
+                              <p style={{ margin: 0, fontWeight: 700, fontSize: "0.9rem", display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span>Día reportado: {dateStr}</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: isDark ? '#888' : '#999' }}>Reg. {createdShortDate} H:{createdTimeStr}</span>
+                              </p>
                            </div>
                            <div style={{ textAlign: "right" }}>
                              {hasDiscrepancy && (

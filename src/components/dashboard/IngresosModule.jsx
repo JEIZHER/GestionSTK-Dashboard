@@ -52,7 +52,12 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
               datos_custom: {},
               _total_rec: 0,
               _total_ent: 0,
+              kpi_logrado: undefined,
             };
+
+            if (r.kpi_logrado !== undefined && r.kpi_logrado !== null) {
+              existing.kpi_logrado = r.kpi_logrado;
+            }
 
             existing.rec_cte += (r.rec_cte || 0);
             existing.ent_cte += (r.ent_cte || 0);
@@ -105,7 +110,7 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
               const kpiActual = totalRec > 0 ? (totalEnt / totalRec) * 100 : 0;
               return {
                 ...item,
-                kpi_logrado: kpiActual >= 95,
+                kpi_logrado: item.kpi_logrado !== undefined ? item.kpi_logrado : (kpiActual >= 95),
               };
             })
             .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
@@ -161,10 +166,10 @@ export default function IngresosModule({ dateRange, externalRendiciones }) {
       const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : (hc.kpi >= 95);
 
       // 1. Ingresos Standard (Basados en KPI)
-      total += (r.ent_cte || 0) * (kpiLogrado ? (hc.kpi_cte || 0) : (hc.pago_nacional || 0));
-      total += (r.ent_ext || 0) * (kpiLogrado ? (hc.kpi_ext || 0) : (hc.pago_extranjero || 0));
-      total += (r.ent_cod || 0) * (kpiLogrado ? (hc.kpi_cod || 0) : (hc.pago_cod || 0));
-      total += (r.ent_pxp || 0) * (kpiLogrado ? (hc.kpi_pxp || 0) : (hc.pago_pxp || 0));
+      total += (r.ent_cte || 0) * (Number(hc.kpi_cte) > 0 ? (kpiLogrado ? Number(hc.kpi_cte) : Number(hc.pago_nacional || 0)) : Number(hc.pago_nacional || 0));
+      total += (r.ent_ext || 0) * (Number(hc.kpi_ext) > 0 ? (kpiLogrado ? Number(hc.kpi_ext) : Number(hc.pago_extranjero || 0)) : Number(hc.pago_extranjero || 0));
+      total += (r.ent_cod || 0) * (Number(hc.kpi_cod) > 0 ? (kpiLogrado ? Number(hc.kpi_cod) : Number(hc.pago_cod || 0)) : Number(hc.pago_cod || 0));
+      total += (r.ent_pxp || 0) * (Number(hc.kpi_pxp) > 0 ? (kpiLogrado ? Number(hc.kpi_pxp) : Number(hc.pago_pxp || 0)) : Number(hc.pago_pxp || 0));
 
       // 2. Custom Tariffs
       if (r.datos_custom && typeof r.datos_custom === 'object') {
