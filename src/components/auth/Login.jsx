@@ -38,8 +38,10 @@ export default function Login() {
         <h2 className='text-center text-lg font-bold mb-6 text-[#333333]'>Iniciar Sesión</h2>
         <form onSubmit={handleSubmit} className='flex flex-col gap-4'>
           <div className='flex flex-col gap-1'>
-            <label className='text-xs font-bold text-[#333333] uppercase'>Correo Electrónico</label>
+            <label htmlFor="email" className='text-xs font-bold text-[#333333] uppercase'>Correo Electrónico</label>
             <input
+              id="email"
+              name="email"
               type='email'
               required
               className='p-3 border border-[#E0E0E0] rounded bg-white text-[#333333] focus:outline-none focus:border-[#E30613]'
@@ -48,8 +50,10 @@ export default function Login() {
             />
           </div>
           <div className='flex flex-col gap-1'>
-            <label className='text-xs font-bold text-[#333333] uppercase'>Contraseña</label>
+            <label htmlFor="password" className='text-xs font-bold text-[#333333] uppercase'>Contraseña</label>
             <input
+              id="password"
+              name="password"
               type='password'
               required
               className='p-3 border border-[#E0E0E0] rounded bg-white text-[#333333] focus:outline-none focus:border-[#E30613]'

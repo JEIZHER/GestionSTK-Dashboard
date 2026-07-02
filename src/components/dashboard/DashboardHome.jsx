@@ -1037,6 +1037,9 @@ export default function DashboardHome() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CalendarDays size={16} color={theme.accent} />
                     <input 
+                      id="inventory_date_from"
+                      name="inventory_date_from"
+                      aria-label="Fecha inicio inventario"
                       type="date" 
                       value={dateRange.from}
                       onClick={(e) => {
@@ -1061,6 +1064,9 @@ export default function DashboardHome() {
                   </div>
                   <ArrowRight size={14} color="#888" />
                   <input 
+                    id="inventory_date_to"
+                    name="inventory_date_to"
+                    aria-label="Fecha fin inventario"
                     type="date" 
                     value={dateRange.to}
                     onClick={(e) => {
@@ -1308,6 +1314,9 @@ export default function DashboardHome() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CalendarDays size={16} color={theme.accent} />
                     <input 
+                      id="rendiciones_date_from"
+                      name="rendiciones_date_from"
+                      aria-label="Fecha inicio rendiciones"
                       type="date" 
                       value={dateRange.from}
                       onClick={(e) => {
@@ -1331,6 +1340,9 @@ export default function DashboardHome() {
                   </div>
                   <ArrowRight size={14} color="#888" />
                   <input 
+                    id="rendiciones_date_to"
+                    name="rendiciones_date_to"
+                    aria-label="Fecha fin rendiciones"
                     type="date" 
                     value={dateRange.to}
                     onClick={(e) => {
@@ -1586,6 +1598,9 @@ export default function DashboardHome() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CalendarDays size={16} color={theme.accent} />
                     <input 
+                      id="precision_date_from"
+                      name="precision_date_from"
+                      aria-label="Fecha inicio precisión"
                       type="date" 
                       value={dateRange.from}
                       onClick={(e) => {
@@ -1610,6 +1625,9 @@ export default function DashboardHome() {
                   </div>
                   <ArrowRight size={14} color="#888" />
                   <input 
+                    id="precision_date_to"
+                    name="precision_date_to"
+                    aria-label="Fecha fin precisión"
                     type="date" 
                     value={dateRange.to}
                     onClick={(e) => {
