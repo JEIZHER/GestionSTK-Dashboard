@@ -302,8 +302,10 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Fecha:</label>
+            <label htmlFor="fecha_input" style={{ fontSize: '0.8rem', fontWeight: 700 }}>Fecha:</label>
             <input 
+              id="fecha_input"
+              name="fecha"
               type="date" 
               value={fecha} 
               onChange={e => setFecha(e.target.value)} 
@@ -345,8 +347,10 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                     <label style={{ fontSize: '0.9rem', fontWeight: 700 }}>KPI Logrado (Día):</label>
+                     <label htmlFor="kpi_logrado_input" style={{ fontSize: '0.9rem', fontWeight: 700 }}>KPI Logrado (Día):</label>
                      <input 
+                       id="kpi_logrado_input"
+                       name="kpi_logrado"
                        type="checkbox" 
                        checked={rendicionData.kpi_logrado}
                        onChange={e => handleRendicionChange('kpi_logrado', e.target.checked)}
@@ -359,16 +363,16 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                       <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase' }}>Pago {tipo === 'cte' ? 'Nacional' : tipo}</h4>
                       <div style={sectionStyle}>
                         <div>
-                          <label style={labelStyle}>Recibidos</label>
-                          <input type="number" value={rendicionData[`rec_${tipo}`]} onChange={e => handleRendicionChange(`rec_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`rec_${tipo}`} style={labelStyle}>Recibidos</label>
+                          <input id={`rec_${tipo}`} name={`rec_${tipo}`} type="number" value={rendicionData[`rec_${tipo}`]} onChange={e => handleRendicionChange(`rec_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                         <div>
-                          <label style={labelStyle}>Entregados</label>
-                          <input type="number" value={rendicionData[`ent_${tipo}`]} onChange={e => handleRendicionChange(`ent_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`ent_${tipo}`} style={labelStyle}>Entregados</label>
+                          <input id={`ent_${tipo}`} name={`ent_${tipo}`} type="number" value={rendicionData[`ent_${tipo}`]} onChange={e => handleRendicionChange(`ent_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                         <div>
-                          <label style={labelStyle}>Devueltos</label>
-                          <input type="number" value={rendicionData[`dev_${tipo}`]} onChange={e => handleRendicionChange(`dev_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`dev_${tipo}`} style={labelStyle}>Devueltos</label>
+                          <input id={`dev_${tipo}`} name={`dev_${tipo}`} type="number" value={rendicionData[`dev_${tipo}`]} onChange={e => handleRendicionChange(`dev_${tipo}`, parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                       </div>
                     </div>
@@ -380,16 +384,16 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                       <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.9rem', fontWeight: 700 }}>{key} (Custom)</h4>
                       <div style={sectionStyle}>
                         <div>
-                          <label style={labelStyle}>Recibidos</label>
-                          <input type="number" value={rendicionData.datos_custom[key].rec || 0} onChange={e => handleCustomDataChange(key, 'rec', parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`rec_custom_${key}`} style={labelStyle}>Recibidos</label>
+                          <input id={`rec_custom_${key}`} name={`rec_custom_${key}`} type="number" value={rendicionData.datos_custom[key].rec || 0} onChange={e => handleCustomDataChange(key, 'rec', parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                         <div>
-                          <label style={labelStyle}>Entregados</label>
-                          <input type="number" value={rendicionData.datos_custom[key].ent || 0} onChange={e => handleCustomDataChange(key, 'ent', parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`ent_custom_${key}`} style={labelStyle}>Entregados</label>
+                          <input id={`ent_custom_${key}`} name={`ent_custom_${key}`} type="number" value={rendicionData.datos_custom[key].ent || 0} onChange={e => handleCustomDataChange(key, 'ent', parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                         <div>
-                          <label style={labelStyle}>Devueltos</label>
-                          <input type="number" value={rendicionData.datos_custom[key].dev || 0} onChange={e => handleCustomDataChange(key, 'dev', parseInt(e.target.value)||0)} style={inputStyle} />
+                          <label htmlFor={`dev_custom_${key}`} style={labelStyle}>Devueltos</label>
+                          <input id={`dev_custom_${key}`} name={`dev_custom_${key}`} type="number" value={rendicionData.datos_custom[key].dev || 0} onChange={e => handleCustomDataChange(key, 'dev', parseInt(e.target.value)||0)} style={inputStyle} />
                         </div>
                       </div>
                     </div>
@@ -417,25 +421,26 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.8rem' }}>
                     <div>
-                      <label style={labelStyle}>Total OFs</label>
-                      <input type="number" value={precisionData.total_ofs} onChange={e => handlePrecisionChange('total_ofs', parseInt(e.target.value)||0)} style={inputStyle} />
+                      <label htmlFor="total_ofs" style={labelStyle}>Total OFs</label>
+                      <input id="total_ofs" name="total_ofs" type="number" value={precisionData.total_ofs} onChange={e => handlePrecisionChange('total_ofs', parseInt(e.target.value)||0)} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Matches Directos</label>
-                      <input type="number" value={precisionData.matches_directos} onChange={e => handlePrecisionChange('matches_directos', parseInt(e.target.value)||0)} style={inputStyle} />
+                      <label htmlFor="matches_directos" style={labelStyle}>Matches Directos</label>
+                      <input id="matches_directos" name="matches_directos" type="number" value={precisionData.matches_directos} onChange={e => handlePrecisionChange('matches_directos', parseInt(e.target.value)||0)} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Sugerencias Aceptadas</label>
-                      <input type="number" value={precisionData.sugerencias_aceptadas} onChange={e => handlePrecisionChange('sugerencias_aceptadas', parseInt(e.target.value)||0)} style={inputStyle} />
+                      <label htmlFor="sugerencias_aceptadas" style={labelStyle}>Sugerencias Aceptadas</label>
+                      <input id="sugerencias_aceptadas" name="sugerencias_aceptadas" type="number" value={precisionData.sugerencias_aceptadas} onChange={e => handlePrecisionChange('sugerencias_aceptadas', parseInt(e.target.value)||0)} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Sugerencias Rechazadas</label>
-                      <input type="number" value={precisionData.sugerencias_rechazadas} onChange={e => handlePrecisionChange('sugerencias_rechazadas', parseInt(e.target.value)||0)} style={inputStyle} />
+                      <label htmlFor="sugerencias_rechazadas" style={labelStyle}>Sugerencias Rechazadas</label>
+                      <input id="sugerencias_rechazadas" name="sugerencias_rechazadas" type="number" value={precisionData.sugerencias_rechazadas} onChange={e => handlePrecisionChange('sugerencias_rechazadas', parseInt(e.target.value)||0)} style={inputStyle} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Contactos Manuales</label>
-                      <input type="number" value={precisionData.contactos_manuales} onChange={e => handlePrecisionChange('contactos_manuales', parseInt(e.target.value)||0)} style={inputStyle} />
+                      <label htmlFor="contactos_manuales" style={labelStyle}>Contactos Manuales</label>
+                      <input id="contactos_manuales" name="contactos_manuales" type="number" value={precisionData.contactos_manuales} onChange={e => handlePrecisionChange('contactos_manuales', parseInt(e.target.value)||0)} style={inputStyle} />
                     </div>
+                  </div>
               </div>
             </div>
           )}
