@@ -31,6 +31,7 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import EditActivityModal from './EditActivityModal';
 
 export default function DashboardHome() {
   const { user, logout } = useAuth();
@@ -41,6 +42,9 @@ export default function DashboardHome() {
   const [cuenta, setCuenta] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  const [editingActivity, setEditingActivity] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [stats, setStats] = useState({
     totalSectores: 0,
     totalContactos: 0,
@@ -427,17 +431,17 @@ export default function DashboardHome() {
         // 6. Fetch recent activity (Actividad Reciente) independent of date filter
         const { data: recentRendiciones } = await supabase
           .from("rendiciones_diarias")
-          .select("fecha, created_at, id")
+          .select("*")
           .eq("auth_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(10);
+          .limit(30);
 
         const { data: recentPrecision } = await supabase
           .from("reportes_precision")
-          .select("fecha, created_at, id")
+          .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(10);
+          .limit(30);
 
         const mapActivity = new Map();
         
@@ -452,15 +456,7 @@ export default function DashboardHome() {
         });
 
         const recentActivityRaw = Array.from(mapActivity.values())
-          .map(item => ({
-            ...item,
-            maxTime: new Date(Math.max(
-              item.rendicion ? new Date(item.rendicion.created_at).getTime() : 0,
-              item.precision ? new Date(item.precision.created_at).getTime() : 0
-            ))
-          }))
-          .sort((a, b) => b.maxTime - a.maxTime)
-          .slice(0, 3);
+          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
           
         setRecentActivity(recentActivityRaw);
 
@@ -478,7 +474,7 @@ export default function DashboardHome() {
       }
     }
     fetchData();
-  }, [user, dateRange.from, dateRange.to]); // Se dispara cuando cambian las fechas o el usuario
+  }, [user, dateRange, refreshKey]);
 
   if (loading) return (
     <div style={{ 
@@ -829,7 +825,13 @@ export default function DashboardHome() {
               }}>
                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
                     <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800 }}>Actividad Reciente</h3>
-                    <button style={{ color: theme.accent, fontSize: "0.8rem", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>Ver todo</button>
+                    {recentActivity.length > 3 && (
+                      <button 
+                        onClick={() => setShowAllActivity(!showAllActivity)}
+                        style={{ color: theme.accent, fontSize: "0.8rem", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>
+                        {showAllActivity ? "Ver menos" : "Ver todo"}
+                      </button>
+                    )}
                  </div>
                  
                  {/* Tarifa change notes from last 5 days */}
@@ -916,27 +918,51 @@ export default function DashboardHome() {
                       <p style={{ fontSize: "0.9rem" }}>No hay movimientos registrados recientes</p>
                    </div>
                  ) : (
-                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                     {recentActivity.map((act, i) => {
+                   <div style={{ 
+                     display: "flex", 
+                     flexDirection: "column", 
+                     gap: "1rem", 
+                     maxHeight: showAllActivity ? "400px" : "auto", 
+                     overflowY: showAllActivity ? "auto" : "visible",
+                     paddingRight: showAllActivity ? "0.5rem" : "0"
+                   }}>
+                     {recentActivity.slice(0, showAllActivity ? 30 : 3).map((act, i) => {
                        const status = (act.rendicion && act.precision) ? "ok" : "warning";
-                       const timeStr = act.maxTime.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-                       const createdDateStr = act.maxTime.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                       const createdAt = new Date(act.rendicion?.created_at || act.precision?.created_at || act.fecha);
+                       const timeStr = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                       const createdDateStr = createdAt.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
                        const dateStr = (() => {
                          const [y, m, d] = (act.fecha || '').split('T')[0].split('-');
                          if (!y || !m || !d) return act.fecha;
                          return new Date(y, m - 1, d).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
                        })();
                        
+                       // Discrepancy check
+                       const rendTotalRec = act.rendicion
+                         ? (act.rendicion.rec_cte||0) + (act.rendicion.rec_ext||0) + (act.rendicion.rec_cod||0) + (act.rendicion.rec_pxp||0) +
+                           (() => { try { const c = typeof act.rendicion.datos_custom === 'string' ? JSON.parse(act.rendicion.datos_custom) : (act.rendicion.datos_custom||{}); return Object.values(c).reduce((s,v) => s+(v.rec||0), 0); } catch(e){ return 0; } })()
+                         : null;
+                       const precTotal = act.precision ? (act.precision.total_ofs ?? null) : null;
+                       const hasDiscrepancy = rendTotalRec !== null && precTotal !== null && rendTotalRec !== precTotal;
+                       
                        return (
-                         <div key={i} style={{ 
-                           display: "flex", 
-                           alignItems: "center", 
-                           justifyContent: "space-between",
-                           padding: "1rem",
-                           backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA",
-                           borderRadius: "12px",
-                           borderLeft: `4px solid ${status === "ok" ? "#34C759" : "#FF9500"}`
-                         }}>
+                         <div 
+                           key={i} 
+                           onClick={() => setEditingActivity(act)}
+                           style={{ 
+                             display: "flex", 
+                             alignItems: "center", 
+                             justifyContent: "space-between",
+                             padding: "1rem",
+                             backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA",
+                             borderRadius: "12px",
+                             borderLeft: `4px solid ${status === "ok" ? "#34C759" : "#FF9500"}`,
+                             cursor: "pointer",
+                             transition: "background-color 0.2s"
+                           }}
+                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.05)" : "#F0F0F0"}
+                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA"}
+                         >
                            <div>
                              <p style={{ margin: "0 0 0.25rem", fontWeight: 700, fontSize: "0.95rem" }}>
                                Día reportado: {dateStr}
@@ -946,6 +972,11 @@ export default function DashboardHome() {
                              </p>
                            </div>
                            <div style={{ textAlign: "right" }}>
+                             {hasDiscrepancy && (
+                                <div style={{ fontSize: "0.72rem", color: "#FF3B30", fontWeight: 700, backgroundColor: isDark ? "rgba(255,59,48,0.1)" : "#FFF0EE", padding: "0.25rem 0.5rem", borderRadius: "6px", marginBottom: "0.4rem" }}>
+                                  ⚠ Rend: {rendTotalRec} / Prec: {precTotal} OFs
+                                </div>
+                              )}
                              {status === "ok" ? (
                                <span style={{ fontSize: "0.8rem", color: "#34C759", fontWeight: 700, backgroundColor: isDark ? "rgba(52, 199, 89, 0.1)" : "#E8F8EE", padding: "0.3rem 0.6rem", borderRadius: "8px" }}>Completado</span>
                              ) : (
@@ -1800,6 +1831,19 @@ export default function DashboardHome() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+      <EditActivityModal 
+        isOpen={!!editingActivity}
+        onClose={() => setEditingActivity(null)}
+        activity={editingActivity}
+        onSave={() => {
+          setEditingActivity(null);
+          setRefreshKey(prev => prev + 1);
+        }}
+        theme={theme}
+        isDark={isDark}
+        user={user}
+        cuenta={cuenta}
+      />
     </div>
   );
 }
