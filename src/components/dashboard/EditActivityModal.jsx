@@ -442,7 +442,6 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                     </div>
                   </div>
               </div>
-            </div>
           )}
         </div>
 
