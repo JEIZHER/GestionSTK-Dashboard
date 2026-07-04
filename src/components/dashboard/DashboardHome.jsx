@@ -439,25 +439,29 @@ export default function DashboardHome() {
           .select("*")
           .eq("auth_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(30);
+          .limit(100);
 
         const { data: recentPrecision } = await supabase
           .from("reportes_precision")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(30);
+          .limit(100);
 
         const mapActivity = new Map();
         
         (recentRendiciones || []).forEach(r => {
-           if(!mapActivity.has(r.fecha)) mapActivity.set(r.fecha, { fecha: r.fecha, rendicion: r, precision: null });
-           else mapActivity.get(r.fecha).rendicion = r;
+           if (!r.fecha) return;
+           const key = r.fecha.split('T')[0];
+           if(!mapActivity.has(key)) mapActivity.set(key, { fecha: key, rendicion: r, precision: null });
+           else mapActivity.get(key).rendicion = r;
         });
         
         (recentPrecision || []).forEach(p => {
-           if(!mapActivity.has(p.fecha)) mapActivity.set(p.fecha, { fecha: p.fecha, rendicion: null, precision: p });
-           else mapActivity.get(p.fecha).precision = p;
+           if (!p.fecha) return;
+           const key = p.fecha.split('T')[0];
+           if(!mapActivity.has(key)) mapActivity.set(key, { fecha: key, rendicion: null, precision: p });
+           else mapActivity.get(key).precision = p;
         });
 
         const recentActivityRaw = Array.from(mapActivity.values())
