@@ -4,6 +4,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 import IngresosModule from './IngresosModule';
+import TableView from './TableView';
 import { 
   User, 
   Settings, 
@@ -20,7 +21,8 @@ import {
   BarChart3,
   CalendarDays,
   ArrowRight,
-  Monitor
+  Monitor,
+  Table2
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -40,7 +42,7 @@ export default function DashboardHome() {
   const [cuentaHistorial, setCuentaHistorial] = useState([]);
   // Kept for display purposes — the latest record
   const [cuenta, setCuenta] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
@@ -113,16 +115,41 @@ export default function DashboardHome() {
     custom: theme.primary // Fallback para custom
   };
 
+  // Vista activa: 'charts' | 'table'
+  const [dashboardView, setDashboardView] = useState(() => {
+    try { return localStorage.getItem('dashboard_view') || 'charts'; } catch { return 'charts'; }
+  });
+  const toggleDashboardView = () => {
+    setDashboardView(prev => {
+      const next = prev === 'charts' ? 'table' : 'charts';
+      try { localStorage.setItem('dashboard_view', next); } catch {}
+      return next;
+    });
+  };
+
   // Vistas de gráficos
   const [chartViewRec, setChartViewRec] = useState("total");
   const [chartViewEnt, setChartViewEnt] = useState("total");
   const [chartViewIng, setChartViewIng] = useState("total");
 
   // Estados para filtros de Recepción
-  const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0]
+  const [dateRange, setDateRange] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_dateRange');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {
+      from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+      to: new Date().toISOString().split('T')[0],
+    };
   });
+
+  // Persistir selección de rango en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('dashboard_dateRange', JSON.stringify(dateRange));
+    } catch (_) {}
+  }, [dateRange]);
 
   // Función para calcular días hábiles (Lunes a Sábado) en el rango seleccionado
   const calculateWorkDaysInPeriod = (from, to) => {
@@ -795,25 +822,130 @@ export default function DashboardHome() {
           {activeTab === "inventory" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
                <header style={{ 
-                 marginBottom: "1.5rem", 
-                 flexWrap: "wrap", 
-                 gap: "1rem",
-                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
-                 transition: "padding 0.3s"
-               }}>
-                <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>
-                  Dashboard
-                </h2>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem", marginTop: "0.5rem" }}>
-                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: theme.accent, fontSize: "0.85rem", fontWeight: 800 }}>
-                      <User size={14} />
-                      {profile?.nombre}
-                   </div>
-                   <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: theme.border }} />
-                   <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text }}>{profile?.region_asignada}</span>
-                </div>
-              </header>
+                  marginBottom: "1.5rem", 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: isMobile ? "flex-start" : "center",
+                  flexDirection: isMobile ? "column" : "row",
+                  flexWrap: "wrap",
+                  gap: "1rem",
+                  paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
+                  transition: "padding 0.3s"
+                }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>
+                        Dashboard
+                      </h2>
+                      {/* Toggle view */}
+                      <button
+                        onClick={toggleDashboardView}
+                        title={dashboardView === 'charts' ? 'Ver tabla' : 'Ver gráficos'}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          padding: "0.35rem 0.75rem",
+                          borderRadius: "10px",
+                          border: `1px solid ${theme.border}`,
+                          background: dashboardView === 'table' ? theme.accent : theme.sidebar,
+                          color: dashboardView === 'table' ? (theme.accent === '#FBFF00' ? '#111' : '#fff') : theme.text,
+                          cursor: "pointer",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {dashboardView === 'charts' ? <Table2 size={15} /> : <BarChart3 size={15} />}
+                        {dashboardView === 'charts' ? 'Tabla' : 'Gráficos'}
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem", marginTop: "0.5rem" }}>
+                       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: theme.accent, fontSize: "0.85rem", fontWeight: 800 }}>
+                          <User size={14} />
+                          {profile?.nombre}
+                       </div>
+                       <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: theme.border }} />
+                       <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text }}>{profile?.region_asignada}</span>
+                    </div>
+                  </div>
 
+                  {/* Filtro de Fechas */}
+                  <div 
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: "0.75rem", 
+                      backgroundColor: theme.sidebar, 
+                      padding: "0.6rem 1rem", 
+                      borderRadius: "16px",
+                      border: `1px solid ${theme.border}`,
+                      boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                      position: "relative",
+                      zIndex: 1000,
+                      width: isMobile ? "100%" : "auto",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <CalendarDays size={16} color={theme.accent} />
+                      <input 
+                        id="dashboard_date_from"
+                        name="dashboard_date_from"
+                        aria-label="Fecha inicio dashboard"
+                        type="date" 
+                        value={dateRange.from}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (e.target.showPicker) e.target.showPicker();
+                        }}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setDateRange(prev => ({ ...prev, from: e.target.value }));
+                        }}
+                        style={{ 
+                          background: "none", 
+                          border: "none", 
+                          color: theme.text, 
+                          fontSize: "0.8rem", 
+                          fontWeight: 700,
+                          outline: "none",
+                          cursor: "pointer",
+                          width: isMobile ? "85px" : "auto"
+                        }}
+                      />
+                    </div>
+                    <ArrowRight size={14} color="#888" />
+                    <input 
+                      id="dashboard_date_to"
+                      name="dashboard_date_to"
+                      aria-label="Fecha fin dashboard"
+                      type="date" 
+                      value={dateRange.to}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.target.showPicker) e.target.showPicker();
+                      }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setDateRange(prev => ({ ...prev, to: e.target.value }));
+                      }}
+                      style={{ 
+                        background: "none", 
+                        border: "none", 
+                        color: theme.text, 
+                        fontSize: "0.8rem", 
+                        fontWeight: 700,
+                        outline: "none",
+                        cursor: "pointer",
+                        width: isMobile ? "85px" : "auto"
+                      }}
+                    />
+                  </div>
+                </header>
+
+              {/* Stats cards — always visible */}
               <div style={{ 
                 display: "grid", 
                 gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", 
@@ -825,6 +957,18 @@ export default function DashboardHome() {
                   <StatCard label="OF Auto deteccion" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} />
               </div>
 
+              {/* TABLE VIEW */}
+              {dashboardView === 'table' && (
+                <TableView
+                  rendiciones={stats.rendiciones}
+                  cuentaHistorial={cuentaHistorial}
+                  cuenta={cuenta}
+                  dateRange={dateRange}
+                />
+              )}
+
+              {/* CHARTS VIEW */}
+              {dashboardView === 'charts' && (
               <div style={{ 
                 backgroundColor: theme.sidebar, 
                 borderRadius: "24px", 
@@ -1002,6 +1146,7 @@ export default function DashboardHome() {
                    </div>
                  )}
               </div>
+              )} {/* end dashboardView === 'charts' */}
             </div>
           )}
 
