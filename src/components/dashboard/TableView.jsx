@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 const parseTarifasCustom = (raw) => {
@@ -118,8 +118,14 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
     return Array.from(keys).sort();
   }, [rendiciones]);
 
+  const [invertOrder, setInvertOrder] = useState(false);
+
   const rows = useMemo(() => {
-    return (rendiciones || []).slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map((r) => {
+    const sorted = (rendiciones || []).slice().sort((a, b) => {
+      const cmp = String(b.fecha).localeCompare(String(a.fecha));
+      return invertOrder ? -cmp : cmp;
+    });
+    return sorted.map((r) => {
       const hc = getHC(r.fecha);
       const kpiLogrado = r.kpi_logrado !== undefined ? r.kpi_logrado : true;
       const dc = typeof r.datos_custom === "string" ? JSON.parse(r.datos_custom || "{}") : r.datos_custom || {};
@@ -154,7 +160,7 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
         ing_total: ingTotal, iva, total_con_iva: ingTotal + iva,
       };
     });
-  }, [rendiciones, cuentaHistorial, cuenta, customKeys]);
+  }, [rendiciones, cuentaHistorial, cuenta, customKeys, invertOrder]);
 
   const sum = useMemo(() => {
     const s = { rec_cte:0,rec_ext:0,rec_cod:0,rec_pxp:0,rec_total:0,ent_cte:0,ent_ext:0,ent_cod:0,ent_pxp:0,ent_total:0,ing_cte:0,ing_ext:0,ing_cod:0,ing_pxp:0,ing_total:0,iva:0,total_con_iva:0,customRec:{},customEnt:{},customIng:{},jornadas:rows.length };
@@ -187,9 +193,9 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
   }
 
   return (
-    <div style={{ overflowX: "auto", borderRadius: "16px", border, background: bg }}>
+    <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "65vh", borderRadius: "16px", border, background: bg }}>
       <table style={{ borderCollapse: "collapse", width: "100%", color: isDark ? "#E5E7EB" : "#111" }}>
-        <thead>
+        <thead style={{ position: "sticky", top: 0, zIndex: 20 }}>
           {/* ── Fila 1: grupos ── */}
           <tr style={{ background: bgHeader }}>
             <HC style={{ borderRight: border, background: bgSummary, width: FECHA_W, minWidth: FECHA_W, maxWidth: FECHA_W, padding: "4px 2px" }} fontSize={9}>
@@ -230,7 +236,16 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
           {/* SUMMARY ROW */}
           <tr style={{ background: bgSummary, fontWeight: 800, borderBottom: `2px solid ${isDark ? "#333" : "#D1D5DB"}` }}>
             <td style={{ padding: "6px 4px", fontSize: "10px", fontWeight: 850, borderRight: border, whiteSpace: "nowrap", width: FECHA_W, minWidth: FECHA_W, textAlign: "center", color: isDark ? "#fff" : "#111", letterSpacing: "0.05em" }}>
-              FECHA
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                FECHA
+                <button 
+                  onClick={() => setInvertOrder(!invertOrder)} 
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: isDark ? "#9CA3AF" : "#6B7280", padding: "0" }}
+                  title="Invertir orden"
+                >
+                  ⇅
+                </button>
+              </div>
             </td>
             <Num v={sum.rec_cte}  bold area="rec"  isFirst isDark={isDark} />
             <Num v={sum.rec_ext}  bold area="rec"  isDark={isDark} />

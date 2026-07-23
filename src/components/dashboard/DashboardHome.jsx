@@ -1374,8 +1374,8 @@ export default function DashboardHome() {
                     })}
                   </div>
                 </div>
-                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <div style={{ height: isMobile ? "220px" : "280px", width: "100%", marginLeft: isMobile ? "-15px" : "0", position: "relative" }}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
@@ -1657,8 +1657,8 @@ export default function DashboardHome() {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <div style={{ height: isMobile ? "220px" : "280px", width: "100%", marginLeft: isMobile ? "-15px" : "0", position: "relative" }}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
@@ -1866,8 +1866,8 @@ export default function DashboardHome() {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, width: "100%", marginLeft: isMobile ? "-15px" : "0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <div style={{ height: isMobile ? "220px" : "280px", width: "100%", marginLeft: isMobile ? "-15px" : "0", position: "relative" }}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
                       <defs>
                         {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
