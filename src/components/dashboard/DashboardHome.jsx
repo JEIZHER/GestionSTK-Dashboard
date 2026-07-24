@@ -349,6 +349,7 @@ export default function DashboardHome() {
 
             customBreakdown[`rec_${label}`] = (item.rec || 0);
             customBreakdown[`ent_${label}`] = (item.ent || 0);
+            customBreakdown[`range_${label}`] = [(item.ent || 0), (item.rec || 0)];
             customBreakdown[`ing_${label}`] = itemIng;
           });
         }
@@ -364,6 +365,9 @@ export default function DashboardHome() {
         const ingCod = (r.ent_cod || 0) * (Number(c_kpiCod) > 0 ? (kpiLogrado ? Number(c_kpiCod) : Number(c_cod)) : Number(c_cod));
         const ingPxp = (r.ent_pxp || 0) * (Number(c_kpiPxp) > 0 ? (kpiLogrado ? Number(c_kpiPxp) : Number(c_pxp)) : Number(c_pxp));
 
+        const recTotal = (r.rec_cte||0) + (r.rec_ext||0) + (r.rec_cod||0) + (r.rec_pxp||0) + recCustom;
+        const entTotal = (r.ent_cte||0) + (r.ent_ext||0) + (r.ent_cod||0) + (r.ent_pxp||0) + entCustom;
+
         return {
           name: (() => {
              const [year, month, day] = (r.fecha || '').split('T')[0].split('-');
@@ -371,19 +375,29 @@ export default function DashboardHome() {
              return new Date(year, month - 1, day).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
           })(),
           
-          rec_total: (r.rec_cte||0) + (r.rec_ext||0) + (r.rec_cod||0) + (r.rec_pxp||0) + recCustom,
-          rec_cte: r.rec_cte || 0,
-          rec_ext: r.rec_ext || 0,
-          rec_cod: r.rec_cod || 0,
-          rec_pxp: r.rec_pxp || 0,
-          rec_custom: recCustom,
+          rec_total: recTotal,
+          ent_total: entTotal,
+          range_total: [entTotal, recTotal],
 
-          ent_total: (r.ent_cte||0) + (r.ent_ext||0) + (r.ent_cod||0) + (r.ent_pxp||0) + entCustom,
+          rec_cte: r.rec_cte || 0,
           ent_cte: r.ent_cte || 0,
+          range_cte: [r.ent_cte || 0, r.rec_cte || 0],
+
+          rec_ext: r.rec_ext || 0,
           ent_ext: r.ent_ext || 0,
+          range_ext: [r.ent_ext || 0, r.rec_ext || 0],
+
+          rec_cod: r.rec_cod || 0,
           ent_cod: r.ent_cod || 0,
+          range_cod: [r.ent_cod || 0, r.rec_cod || 0],
+
+          rec_pxp: r.rec_pxp || 0,
           ent_pxp: r.ent_pxp || 0,
+          range_pxp: [r.ent_pxp || 0, r.rec_pxp || 0],
+
+          rec_custom: recCustom,
           ent_custom: entCustom,
+          range_custom: [entCustom, recCustom],
 
           ing_total: ingCte + ingExt + ingCod + ingPxp + ingCustom,
           ing_cte: ingCte,
@@ -603,19 +617,12 @@ export default function DashboardHome() {
               theme={theme}
             />
             <SidebarItem 
-              icon={<PackageCheck size={19} />} 
-              label="RECEPCIÓN" 
-              active={activeTab === "recepcion"} 
-              onClick={() => { setActiveTab("recepcion"); if(isMobile) setIsSidebarOpen(false); }}
-              theme={theme}
-            />
-            <SidebarItem 
-              icon={<ClipboardList size={19} />} 
-              label="RENDICIÓN" 
-              active={activeTab === "rendicion"} 
-              onClick={() => { setActiveTab("rendicion"); if(isMobile) setIsSidebarOpen(false); }}
-              theme={theme}
-            />
+               icon={<PackageCheck size={19} />} 
+               label="RECEPCIÓN / RENDICIÓN" 
+               active={activeTab === "recepcion"} 
+               onClick={() => { setActiveTab("recepcion"); if(isMobile) setIsSidebarOpen(false); }}
+               theme={theme}
+             />
             <SidebarItem 
               icon={<Wallet size={19} />} 
               label="INGRESOS" 
@@ -1164,8 +1171,8 @@ export default function DashboardHome() {
                  transition: "padding 0.3s"
                }}>
                 <div>
-                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción de Carga</h2>
-                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Total de paquetes recibidos</p>
+                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Recepción / Rendición</h2>
+                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Seguimiento consolidado de paquetes recibidos y entregados</p>
                 </div>
 
                 {/* Filtro de Fechas */}
@@ -1243,12 +1250,13 @@ export default function DashboardHome() {
                 </div>
               </header>
 
-              {/* Resumen de Recepción */}
+              {/* Resumen de Recepción y Rendición */}
+              {/* Fila 1: DÍAS/JORNADAS + TOTAL CONSOLIDADO */}
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", 
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", 
                 gap: "1.25rem", 
-                marginBottom: "2rem" 
+                marginBottom: "1.25rem" 
               }}>
                 <div style={{ 
                   backgroundColor: theme.sidebar, 
@@ -1262,44 +1270,13 @@ export default function DashboardHome() {
                   alignItems: "center",
                   justifyContent: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>DIAS EN RANGO (L-S)</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>DÍAS / JORNADAS</p>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>{workDaysInPeriod}</span>
-                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>HÁBILES</span>
+                    <span style={{ fontSize: "1.5rem", fontWeight: 900, color: theme.text }}>{workDaysInPeriod}</span>
+                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>/</span>
+                    <span style={{ fontSize: "1.5rem", fontWeight: 900, color: theme.primary }}>{stats.rendiciones.length}</span>
                   </div>
-                </div>
-
-                <div style={{ 
-                  backgroundColor: theme.sidebar, 
-                  padding: "1.25rem 1.5rem", 
-                  borderRadius: "20px", 
-                  border: `1px solid ${theme.border}`,
-                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
-                  textAlign: "center"
-                }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Recibidos por tipo de OF</p>
-                  <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center", flexWrap: "wrap" }}>
-                    <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
-                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900 }}>{totals.rec_normal}</p>
-                    </div>
-                    {/* ... grid separators logic ... */}
-                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>EXT</p>
-                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: theme.accent }}>{totals.rec_ext}</p>
-                    </div>
-                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>COD</p>
-                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#007AFF" }}>{totals.rec_cod}</p>
-                    </div>
-                    <div style={{ width: "1px", height: "18px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>PXP</p>
-                      <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#5856D6" }}>{totals.rec_pxp}</p>
-                    </div>
-                  </div>
+                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.65rem", color: "#888", fontWeight: 700 }}>Hábiles / Trabajadas</p>
                 </div>
 
                 <div style={{ 
@@ -1313,15 +1290,59 @@ export default function DashboardHome() {
                   flexDirection: "column",
                   justifyContent: "center"
                 }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Recepción</p>
+                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Consolidado (Rec / Ent)</p>
                   <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>{totals.rec_normal + totals.rec_ext + totals.rec_cod + totals.rec_pxp + totals.rec_custom}</span>
+                    <span style={{ fontSize: "1.8rem", fontWeight: 900 }}>{totals.rec_normal + totals.rec_ext + totals.rec_cod + totals.rec_pxp + totals.rec_custom}</span>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 700, opacity: 0.8 }}>/</span>
+                    <span style={{ fontSize: "1.8rem", fontWeight: 900 }}>{totals.ent_normal + totals.ent_ext + totals.ent_cod + totals.ent_pxp + totals.ent_custom}</span>
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
                   </div>
                 </div>
               </div>
 
-              {/* Gráfico de Flujo Operativo */}
+              {/* Fila 2: BULTOS POR TIPO — full width */}
+              <div style={{ 
+                backgroundColor: theme.sidebar, 
+                padding: "1.25rem 1.5rem", 
+                borderRadius: "20px", 
+                border: `1px solid ${theme.border}`,
+                boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
+                marginBottom: "2rem"
+              }}>
+                <p style={{ margin: "0 0 0.75rem", fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>Bultos por Tipo (Rec / Ent)</p>
+                <div style={{ display: "flex", gap: "1.25rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>CTE</p>
+                    <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900 }}>{totals.rec_normal}/{totals.ent_normal}</p>
+                  </div>
+                  <div style={{ width: "1px", height: "24px", backgroundColor: theme.border }} />
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>EXT</p>
+                    <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.accent }}>{totals.rec_ext}/{totals.ent_ext}</p>
+                  </div>
+                  <div style={{ width: "1px", height: "24px", backgroundColor: theme.border }} />
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>COD</p>
+                    <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#007AFF" }}>{totals.rec_cod}/{totals.ent_cod}</p>
+                  </div>
+                  <div style={{ width: "1px", height: "24px", backgroundColor: theme.border }} />
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>PXP</p>
+                    <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#5856D6" }}>{totals.rec_pxp}/{totals.ent_pxp}</p>
+                  </div>
+                  {Object.keys(totals.detail_custom).map(key => (
+                    <React.Fragment key={key}>
+                      <div style={{ width: "1px", height: "24px", backgroundColor: theme.border }} />
+                      <div style={{ textAlign: "center" }}>
+                        <p style={{ margin: 0, fontSize: "0.6rem", color: "#888", fontWeight: 700 }}>{getCustomLabel(key)}</p>
+                        <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].rec}/{totals.detail_custom[key].ent}</p>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gráfico de Flujo Operativo Consolidado */}
               <div style={{ 
                 backgroundColor: theme.sidebar, 
                 borderRadius: "28px", 
@@ -1340,7 +1361,7 @@ export default function DashboardHome() {
                   marginBottom: "2rem",
                   gap: "1rem"
                 }}>
-                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Flujo de Paquetes por Día</h3>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Flujo de Paquetes (Recibidos vs Entregados)</h3>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", maxWidth: isMobile ? "100%" : "60%" }}>
                     {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
                       const isActive = visibleCurves.includes(type);
@@ -1377,14 +1398,6 @@ export default function DashboardHome() {
                 <div style={{ height: isMobile ? "220px" : "280px", width: "100%", marginLeft: isMobile ? "-15px" : "0", position: "relative" }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
-                      <defs>
-                        {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
-                          <linearGradient key={type} id={`colorRec_${type}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0}/>
-                          </linearGradient>
-                        ))}
-                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
                       <XAxis angle={-45} textAnchor="end" height={80} 
                         dataKey="name" 
@@ -1410,18 +1423,42 @@ export default function DashboardHome() {
                           fontWeight: 700
                         }}
                       />
-                      {visibleCurves.map(type => (
-                        <Area 
-                          key={type}
-                          type="monotone" 
-                          dataKey={`rec_${type}`} 
-                          stroke={curveColors[type.toLowerCase()] || curveColors.custom} 
-                          strokeWidth={3}
-                          fillOpacity={1} 
-                          fill={`url(#colorRec_${type})`} 
-                          hide={!visibleCurves.includes(type)}
-                        />
-                      ))}
+                      {visibleCurves.map(type => {
+                        const color = curveColors[type.toLowerCase()] || curveColors.custom;
+                        return (
+                          <React.Fragment key={type}>
+                            {/* Area displaying gap/range between Rec and Ent */}
+                            <Area 
+                              type="monotone" 
+                              dataKey={`range_${type}`} 
+                              stroke="none"
+                              fill={color}
+                              fillOpacity={0.15}
+                              name={`${type.toUpperCase()} Brecha`}
+                              activeDot={false}
+                            />
+                            {/* Solid line for Recibidos */}
+                            <Area 
+                              type="monotone" 
+                              dataKey={`rec_${type}`} 
+                              stroke={color} 
+                              strokeWidth={3}
+                              fill="none" 
+                              name={`${type.toUpperCase()} Recibidos`}
+                            />
+                            {/* Dashed line for Entregados */}
+                            <Area 
+                              type="monotone" 
+                              dataKey={`ent_${type}`} 
+                              stroke={color} 
+                              strokeWidth={2.5}
+                              strokeDasharray="5 5"
+                              fill="none" 
+                              name={`${type.toUpperCase()} Entregados`}
+                            />
+                          </React.Fragment>
+                        );
+                      })}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1429,287 +1466,7 @@ export default function DashboardHome() {
             </div>
           )}
 
-          {activeTab === "rendicion" && (
-            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ 
-                 marginBottom: "2rem", 
-                 display: "flex", 
-                 justifyContent: "space-between", 
-                 alignItems: isMobile ? "flex-start" : "flex-end",
-                 flexDirection: "row",
-                 flexWrap: "wrap",
-                 gap: "1.5rem",
-                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
-                 transition: "padding 0.3s"
-               }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Rendición Operativa</h2>
-                  <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Cierre de Nomina, total entregados</p>
-                </div>
 
-                {/* Filtro de Fechas */}
-                <div 
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    gap: "0.75rem", 
-                    backgroundColor: theme.sidebar, 
-                    padding: "0.6rem 1rem", 
-                    borderRadius: "16px",
-                    border: `1px solid ${theme.border}`,
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-                    position: "relative",
-                    zIndex: 1000
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <CalendarDays size={16} color={theme.accent} />
-                    <input 
-                      id="rendiciones_date_from"
-                      name="rendiciones_date_from"
-                      aria-label="Fecha inicio rendiciones"
-                      type="date" 
-                      value={dateRange.from}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (e.target.showPicker) e.target.showPicker();
-                      }}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setDateRange(prev => ({ ...prev, from: e.target.value }));
-                      }}
-                      style={{ 
-                        background: "none", 
-                        border: "none", 
-                        color: theme.text, 
-                        fontSize: "0.8rem", 
-                        fontWeight: 700,
-                        outline: "none",
-                        cursor: "pointer"
-                      }}
-                    />
-                  </div>
-                  <ArrowRight size={14} color="#888" />
-                  <input 
-                    id="rendiciones_date_to"
-                    name="rendiciones_date_to"
-                    aria-label="Fecha fin rendiciones"
-                    type="date" 
-                    value={dateRange.to}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (e.target.showPicker) e.target.showPicker();
-                    }}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setDateRange(prev => ({ ...prev, to: e.target.value }));
-                    }}
-                    style={{ 
-                      background: "none", 
-                      border: "none", 
-                      color: theme.text, 
-                      fontSize: "0.8rem", 
-                      fontWeight: 700, 
-                      outline: "none",
-                      cursor: "pointer"
-                    }}
-                  />
-                </div>
-              </header>
-
-              {/* Resumen de Rendición (Datos Reales) */}
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", 
-                gap: "1rem", 
-                marginBottom: "2rem" 
-              }}>
-                <div style={{ 
-                  backgroundColor: theme.sidebar, 
-                  padding: "1.25rem 1.5rem", 
-                  borderRadius: "20px", 
-                  border: `1px solid ${theme.border}`,
-                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center"
-                }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>JORNADAS TRABAJADAS</p>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "1.75rem", fontWeight: 900, color: theme.text }}>{stats.rendiciones.length}</span>
-                    <span style={{ fontSize: "0.75rem", color: "#888", fontWeight: 700 }}>DÍAS</span>
-                  </div>
-                </div>
-
-                <div style={{ 
-                  backgroundColor: theme.sidebar, 
-                  padding: "1.25rem 1.5rem", 
-                  borderRadius: "20px", 
-                  border: `1px solid ${theme.border}`,
-                  boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
-                  textAlign: "center"
-                }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>ENTREGADOS POR TIPO DE OF</p>
-                  <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>CTE</p>
-                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900 }}>{totals.ent_normal}</p>
-                    </div>
-                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>EXT</p>
-                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.accent }}>{totals.ent_ext}</p>
-                    </div>
-                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>COD</p>
-                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#007AFF" }}>{totals.ent_cod}</p>
-                    </div>
-                    <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>PXP</p>
-                      <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "#5856D6" }}>{totals.ent_pxp}</p>
-                    </div>
-                    {Object.keys(totals.detail_custom).map(key => (
-                      <React.Fragment key={key}>
-                        <div style={{ width: "1px", height: "20px", backgroundColor: theme.border, alignSelf: "center" }} />
-                        <div>
-                          <p style={{ margin: 0, fontSize: "0.55rem", color: "#888", fontWeight: 700 }}>{getCustomLabel(key)}</p>
-                          <p style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: theme.primary }}>{totals.detail_custom[key].ent}</p>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ 
-                  backgroundColor: "#34C759", 
-                  padding: "1.25rem 1.5rem", 
-                  borderRadius: "20px", 
-                  color: "white",
-                  boxShadow: `0 8px 24px -6px rgba(52, 199, 89, 0.4)`,
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center"
-                }}>
-                  <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", opacity: 0.9, letterSpacing: "0.05em" }}>Total Entregados</p>
-                  <div style={{ marginTop: "0.25rem", display: "flex", alignItems: "baseline", gap: "0.4rem", justifyContent: "center" }}>
-                    <span style={{ fontSize: "2rem", fontWeight: 900 }}>{totals.ent_normal + totals.ent_ext + totals.ent_cod + totals.ent_pxp + totals.ent_custom}</span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, opacity: 0.8 }}>BULTOS</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gráfico de Rendición */}
-              <div style={{ 
-                backgroundColor: theme.sidebar, 
-                borderRadius: "28px", 
-                border: `1px solid ${theme.border}`, 
-                padding: isMobile ? "1.5rem" : "2rem",
-                boxShadow: "0 10px 40px -10px rgba(0,0,0,0.03)",
-                height: isMobile ? "350px" : "400px",
-                display: "flex",
-                flexDirection: "column"
-              }}>
-                <div style={{ 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: isMobile ? "flex-start" : "center", 
-                  flexDirection: isMobile ? "column" : "row",
-                  marginBottom: "2rem",
-                  gap: "1rem"
-                }}>
-                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Rendimiento de Entrega</h3>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", maxWidth: isMobile ? "100%" : "60%" }}>
-                    {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => {
-                      const isActive = visibleCurves.includes(type);
-                      const color = curveColors[type.toLowerCase()] || curveColors.custom;
-                      return (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            setVisibleCurves(prev => 
-                              prev.includes(type) 
-                                ? prev.filter(t => t !== type) 
-                                : [...prev, type]
-                            );
-                          }}
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            fontSize: "0.65rem",
-                            fontWeight: 800,
-                            border: `1px solid ${isActive ? color : theme.border}`,
-                            backgroundColor: isActive ? `${color}15` : "transparent",
-                            color: isActive ? color : "#888",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            textTransform: "uppercase"
-                          }}
-                        >
-                          {type}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div style={{ height: isMobile ? "220px" : "280px", width: "100%", marginLeft: isMobile ? "-15px" : "0", position: "relative" }}>
-                  <ResponsiveContainer width="100%" height="100%" minHeight={0}>
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: isMobile ? -30 : -20, bottom: 40 }}>
-                      <defs>
-                        {['total', 'cte', 'ext', 'cod', 'pxp', ...Object.keys(totals.detail_custom).map(getCustomLabel)].map(type => (
-                          <linearGradient key={type} id={`colorEnt_${type}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={curveColors[type.toLowerCase()] || curveColors.custom} stopOpacity={0}/>
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#222" : "#F0F0F0"} />
-                      <XAxis angle={-45} textAnchor="end" height={80} 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
-                        dy={10}
-                      />
-                      <YAxis 
-                        width={60}
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 11, fontWeight: 700, fill: "#888" }}
-                        tickFormatter={(val) => new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(val)}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: theme.sidebar, 
-                          borderRadius: "16px", 
-                          border: `1px solid ${theme.border}`,
-                          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
-                          fontSize: "0.8rem",
-                          fontWeight: 700
-                        }}
-                      />
-                      {visibleCurves.map(type => (
-                        <Area 
-                          key={type}
-                          type="monotone" 
-                          dataKey={`ent_${type}`} 
-                          stroke={curveColors[type.toLowerCase()] || curveColors.custom} 
-                          strokeWidth={3}
-                          fillOpacity={1} 
-                          fill={`url(#colorEnt_${type})`} 
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
 
           {activeTab === "ingresos" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
