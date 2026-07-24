@@ -948,13 +948,13 @@ export default function DashboardHome() {
               {/* Stats cards — always visible */}
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", 
-                gap: "1rem", 
-                marginBottom: "2rem" 
+                gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(auto-fit, minmax(200px, 1fr))", 
+                gap: isMobile ? "0.35rem" : "1rem", 
+                marginBottom: isMobile ? "1rem" : "2rem" 
               }}>
-                  <StatCard label="Sectores" value={stats.totalSectores} color={theme.accent} theme={theme} />
-                  <StatCard label="Contactos" value={stats.totalContactos} color={theme.primary} theme={theme} />
-                  <StatCard label="OF Auto deteccion" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} />
+                  <StatCard label="Sectores" value={stats.totalSectores} color={theme.accent} theme={theme} isMobile={isMobile} />
+                  <StatCard label="Contactos" value={stats.totalContactos} color={theme.primary} theme={theme} isMobile={isMobile} />
+                  <StatCard label="OF Auto" value={`${stats.promedioPrecision}%`} color="#34C759" theme={theme} isMobile={isMobile} />
               </div>
 
               {/* TABLE VIEW */}
@@ -2066,20 +2066,21 @@ function SidebarItem({ icon, label, active, onClick, theme }) {
   );
 }
 
-function StatCard({ label, value, color, theme }) {
+function StatCard({ label, value, color, theme, isMobile }) {
   return (
     <div style={{ 
       backgroundColor: theme.sidebar, 
-      padding: "1.25rem 1.5rem", 
-      borderRadius: "20px", 
+      padding: isMobile ? "0.4rem 0.4rem" : "1.25rem 1.5rem", 
+      borderRadius: isMobile ? "12px" : "20px", 
       border: `1px solid ${theme.border}`,
       boxShadow: "0 2px 12px -5px rgba(0,0,0,0.03)",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "center"
+      justifyContent: "center",
+      minWidth: 0
     }}>
-      <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
-      <p style={{ margin: "0.25rem 0 0", fontSize: "1.5rem", fontWeight: 900, color }}>{value}</p>
+      <p style={{ margin: 0, fontSize: isMobile ? "0.55rem" : "0.7rem", fontWeight: 800, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
+      <p style={{ margin: isMobile ? "0.1rem 0 0" : "0.25rem 0 0", fontSize: isMobile ? "1rem" : "1.5rem", fontWeight: 900, color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</p>
     </div>
   );
 }
