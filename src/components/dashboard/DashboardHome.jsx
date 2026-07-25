@@ -377,26 +377,32 @@ export default function DashboardHome() {
           
           rec_total: recTotal,
           ent_total: entTotal,
+          dev_total: Math.max(0, recTotal - entTotal),
           range_total: [entTotal, recTotal],
 
           rec_cte: r.rec_cte || 0,
           ent_cte: r.ent_cte || 0,
+          dev_cte: Math.max(0, (r.rec_cte || 0) - (r.ent_cte || 0)),
           range_cte: [r.ent_cte || 0, r.rec_cte || 0],
 
           rec_ext: r.rec_ext || 0,
           ent_ext: r.ent_ext || 0,
+          dev_ext: Math.max(0, (r.rec_ext || 0) - (r.ent_ext || 0)),
           range_ext: [r.ent_ext || 0, r.rec_ext || 0],
 
           rec_cod: r.rec_cod || 0,
           ent_cod: r.ent_cod || 0,
+          dev_cod: Math.max(0, (r.rec_cod || 0) - (r.ent_cod || 0)),
           range_cod: [r.ent_cod || 0, r.rec_cod || 0],
 
           rec_pxp: r.rec_pxp || 0,
           ent_pxp: r.ent_pxp || 0,
+          dev_pxp: Math.max(0, (r.rec_pxp || 0) - (r.ent_pxp || 0)),
           range_pxp: [r.ent_pxp || 0, r.rec_pxp || 0],
 
           rec_custom: recCustom,
           ent_custom: entCustom,
+          dev_custom: Math.max(0, recCustom - entCustom),
           range_custom: [entCustom, recCustom],
 
           ing_total: ingCte + ingExt + ingCod + ingPxp + ingCustom,
@@ -1425,16 +1431,18 @@ export default function DashboardHome() {
                       />
                       {visibleCurves.map(type => {
                         const color = curveColors[type.toLowerCase()] || curveColors.custom;
+                        // Lighter/complementary color for the returns (dev) line
+                        const devColor = `${color}99`; // same hue, 60% opacity as hex alpha
                         return (
                           <React.Fragment key={type}>
-                            {/* Area displaying gap/range between Rec and Ent */}
+                            {/* Area displaying gap between Rec and Ent */}
                             <Area 
                               type="monotone" 
                               dataKey={`range_${type}`} 
                               stroke="none"
                               fill={color}
                               fillOpacity={0.15}
-                              name={`${type.toUpperCase()} Brecha`}
+                              name={`${type.toUpperCase()} Devueltas`}
                               activeDot={false}
                             />
                             {/* Solid line for Recibidos */}
@@ -1446,15 +1454,14 @@ export default function DashboardHome() {
                               fill="none" 
                               name={`${type.toUpperCase()} Recibidos`}
                             />
-                            {/* Dashed line for Entregados */}
+                            {/* Solid line for Devueltas (rec - ent) */}
                             <Area 
                               type="monotone" 
-                              dataKey={`ent_${type}`} 
-                              stroke={color} 
+                              dataKey={`dev_${type}`} 
+                              stroke={devColor}
                               strokeWidth={2.5}
-                              strokeDasharray="5 5"
                               fill="none" 
-                              name={`${type.toUpperCase()} Entregados`}
+                              name={`${type.toUpperCase()} Devueltas`}
                             />
                           </React.Fragment>
                         );
