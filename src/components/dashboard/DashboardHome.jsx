@@ -1428,11 +1428,16 @@ export default function DashboardHome() {
                           fontSize: "0.8rem",
                           fontWeight: 700
                         }}
+                        formatter={(value, name) => {
+                          if (Array.isArray(value)) {
+                            const diff = Math.max(0, value[1] - value[0]);
+                            return [diff, name];
+                          }
+                          return [value, name];
+                        }}
                       />
                       {visibleCurves.map(type => {
                         const color = curveColors[type.toLowerCase()] || curveColors.custom;
-                        // Lighter/complementary color for the returns (dev) line
-                        const devColor = `${color}99`; // same hue, 60% opacity as hex alpha
                         return (
                           <React.Fragment key={type}>
                             {/* Area displaying gap between Rec and Ent */}
@@ -1442,7 +1447,7 @@ export default function DashboardHome() {
                               stroke="none"
                               fill={color}
                               fillOpacity={0.15}
-                              name={`${type.toUpperCase()} Devueltas`}
+                              name={`${type.toUpperCase()} DEV`}
                               activeDot={false}
                             />
                             {/* Solid line for Recibidos */}
@@ -1452,16 +1457,17 @@ export default function DashboardHome() {
                               stroke={color} 
                               strokeWidth={3}
                               fill="none" 
-                              name={`${type.toUpperCase()} Recibidos`}
+                              name={`${type.toUpperCase()} REC`}
                             />
-                            {/* Solid line for Devueltas (rec - ent) */}
+                            {/* Solid line for Entregados — same hue, lighter */}
                             <Area 
                               type="monotone" 
-                              dataKey={`dev_${type}`} 
-                              stroke={devColor}
+                              dataKey={`ent_${type}`} 
+                              stroke={color}
                               strokeWidth={2.5}
+                              strokeOpacity={0.5}
                               fill="none" 
-                              name={`${type.toUpperCase()} Devueltas`}
+                              name={`${type.toUpperCase()} ENT`}
                             />
                           </React.Fragment>
                         );
