@@ -5,6 +5,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 import IngresosModule from './IngresosModule';
 import TableView from './TableView';
+import ReporteRendicion from './ReporteRendicion';
 import { 
   User, 
   Settings, 
@@ -22,7 +23,8 @@ import {
   CalendarDays,
   ArrowRight,
   Monitor,
-  Table2
+  Table2,
+  FileText
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -648,6 +650,13 @@ export default function DashboardHome() {
               label="Vincular Settings" 
               active={activeTab === "settings"} 
               onClick={() => { setActiveTab("settings"); if(isMobile) setIsSidebarOpen(false); }}
+              theme={theme}
+            />
+            <SidebarItem 
+              icon={<FileText size={19} />} 
+              label="REPORTE" 
+              active={activeTab === "reporte"} 
+              onClick={() => { setActiveTab("reporte"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
           </nav>
@@ -1760,6 +1769,23 @@ export default function DashboardHome() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === "reporte" && (
+            <div style={{ animation: "fadeIn 0.4s ease-out", padding: isMobile ? "1.5rem 1rem" : "2.5rem 2rem" }}>
+              <header style={{ marginBottom: "2rem", paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0", transition: "padding 0.3s" }}>
+                <h2 style={{ fontSize: isMobile ? "1.5rem" : "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Reporte de Rendición</h2>
+                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem" }}>Vista imprimible del período seleccionado</p>
+              </header>
+              <ReporteRendicion
+                profile={profile}
+                cuenta={cuenta}
+                rendiciones={stats.rendiciones}
+                dateRange={dateRange}
+                theme={theme}
+                isDark={isDark}
+              />
             </div>
           )}
         </div>
