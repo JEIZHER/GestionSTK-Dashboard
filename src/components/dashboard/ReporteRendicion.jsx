@@ -11,7 +11,49 @@ import { Printer } from "lucide-react";
  *  - theme        ThemeContext value
  *  - isDark       boolean
  */
-export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRange, theme, isDark }) {
+export const triggerPrintHTML = (htmlContent) => {
+  if (!htmlContent) return;
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Reporte de Rendición</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #111; padding: 12mm 10mm; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th { background: #f3f4f6; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; padding: 5px 6px; border: 1px solid #d1d5db; text-align: center; }
+        td { font-size: 8.5pt; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+        td:first-child, th:first-child { text-align: left; }
+        .ent { color: #1d4ed8; font-weight: 700; }
+        .total-row td { font-weight: 900; border-top: 2px solid #d1d5db; color: #1d4ed8; }
+        .summary { margin-top: 14px; display: flex; gap: 24px; }
+        .summary-item p:first-child { font-size: 7pt; color: #6b7280; text-transform: uppercase; font-weight: 700; }
+        .summary-item p:last-child { font-size: 16pt; font-weight: 900; }
+        .dev { color: #dc2626; }
+        h2 { font-size: 13pt; font-weight: 900; margin-bottom: 10px; }
+        .meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px 16px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
+        .meta .label { font-size: 7pt; color: #6b7280; }
+        .meta .value { font-size: 9pt; font-weight: 700; }
+        .sunday-row { opacity: 0.35; }
+        /* Evitar que el tfoot (totales) se repita al pie de cada página intermedia */
+        tfoot { display: table-row-group; page-break-inside: avoid; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        @page { size: A4 portrait; margin: 12mm 10mm; }
+      </style>
+    </head>
+    <body>${htmlContent}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+};
+
+export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRange, theme, isDark, hidePrintButton }) {
   const reportRef = useRef(null);
 
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -84,41 +126,7 @@ export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRan
 
   // ── print ─────────────────────────────────────────────────────────────────
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    const html = reportRef.current?.innerHTML || '';
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Reporte de Rendición</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #111; padding: 12mm 10mm; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th { background: #f3f4f6; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; padding: 5px 6px; border: 1px solid #d1d5db; text-align: center; }
-          td { font-size: 8.5pt; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; text-align: center; }
-          td:first-child, th:first-child { text-align: left; }
-          .ent { color: #1d4ed8; font-weight: 700; }
-          .total-row td { font-weight: 900; border-top: 2px solid #d1d5db; color: #1d4ed8; }
-          .summary { margin-top: 14px; display: flex; gap: 24px; }
-          .summary-item p:first-child { font-size: 7pt; color: #6b7280; text-transform: uppercase; font-weight: 700; }
-          .summary-item p:last-child { font-size: 16pt; font-weight: 900; }
-          .dev { color: #dc2626; }
-          h2 { font-size: 13pt; font-weight: 900; margin-bottom: 10px; }
-          .meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px 16px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
-          .meta .label { font-size: 7pt; color: #6b7280; }
-          .meta .value { font-size: 9pt; font-weight: 700; }
-          .sunday-row { opacity: 0.35; }
-          @page { size: A4 portrait; margin: 12mm 10mm; }
-        </style>
-      </head>
-      <body>${html}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+    triggerPrintHTML(reportRef.current?.innerHTML);
   };
 
   // ── empresa / movil / ruta parsing ─────────────────────────────────────────
@@ -155,28 +163,30 @@ export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRan
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
-        <button
-          onClick={handlePrint}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.6rem 1.25rem",
-            borderRadius: "12px",
-            border: "none",
-            backgroundColor: theme.primary,
-            color: "#000",
-            fontWeight: 800,
-            fontSize: "0.85rem",
-            cursor: "pointer",
-            boxShadow: `0 4px 14px -4px ${theme.primary}99`,
-          }}
-        >
-          <Printer size={16} />
-          Generar PDF / Imprimir
-        </button>
-      </div>
+      {!hidePrintButton && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
+          <button
+            onClick={handlePrint}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.6rem 1.25rem",
+              borderRadius: "12px",
+              border: "none",
+              backgroundColor: theme.primary,
+              color: "#000",
+              fontWeight: 800,
+              fontSize: "0.85rem",
+              cursor: "pointer",
+              boxShadow: `0 4px 14px -4px ${theme.primary}99`,
+            }}
+          >
+            <Printer size={16} />
+            Generar PDF / Imprimir
+          </button>
+        </div>
+      )}
 
       {/* Report preview card */}
       <div
@@ -290,7 +300,7 @@ function ReportContent({
             </tr>
           </thead>
           <tbody>
-            {rendiciones.map((r, i) => {
+            {rendiciones.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map((r, i) => {
               const sunday = isSunday(r.fecha);
               const rec_nac = (r.rec_cte || 0) + (r.rec_pxp || 0) + (r.rec_cod || 0);
               const ent_nac = (r.ent_cte || 0) + (r.ent_pxp || 0) + (r.ent_cod || 0);
@@ -313,16 +323,16 @@ function ReportContent({
                   <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: isDark ? "#ddd" : "#111" }}>
                     {formatDate(r.fecha)}
                   </td>
-                  <td style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{ent_nac || "—"}</td>
-                  <td style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{ent_ext || "—"}</td>
+                  <td style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{ent_nac ?? 0}</td>
+                  <td style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{ent_ext ?? 0}</td>
                   {customKeys.map(k => {
                     const cd = getCustomData(r, k);
                     return (
-                      <td key={k} style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{cd.ent || "—"}</td>
+                      <td key={k} style={{ ...cell, color: isDark ? "#aef" : "#1d4ed8", fontWeight: 700 }}>{cd.ent ?? 0}</td>
                     );
                   })}
-                  <td style={{ ...cell, fontWeight: 800, color: isDark ? "#aef" : "#1d4ed8" }}>{ent_total || "—"}</td>
-                  <td style={{ ...cell, color: isDark ? "#666" : "#9ca3af", fontSize: "0.65rem" }}>F: —</td>
+                  <td style={{ ...cell, fontWeight: 950, fontSize: "1.05rem", color: isDark ? "#aef" : "#1d4ed8", backgroundColor: isDark ? "rgba(29, 78, 216, 0.15)" : "#eff6ff" }}>{ent_total ?? 0}</td>
+                  <td style={{ ...cell, color: isDark ? "#aaa" : "#4b5563", fontSize: "0.7rem", fontWeight: 600 }}>{r.folio || "—"}</td>
                 </tr>
               );
             })}
@@ -330,12 +340,12 @@ function ReportContent({
           <tfoot>
             <tr style={{ borderTop: `2px solid ${isDark ? "#444" : "#d1d5db"}` }}>
               <td style={{ ...cell, textAlign: "left", fontWeight: 900, fontSize: "0.8rem" }}>TOTAL</td>
-              <td style={{ ...cell, fontWeight: 900, color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_nac}</td>
-              <td style={{ ...cell, fontWeight: 900, color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_ext}</td>
+              <td style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_nac}</td>
+              <td style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_ext}</td>
               {customKeys.map(k => (
-                <td key={k} style={{ ...cell, fontWeight: 900, color: isDark ? "#aef" : "#1d4ed8" }}>{totals.custom[k]?.ent || 0}</td>
+                <td key={k} style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.custom[k]?.ent || 0}</td>
               ))}
-              <td style={{ ...cell, fontWeight: 900, color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_total}</td>
+              <td style={{ ...cell, fontWeight: 950, fontSize: "1.35rem", color: isDark ? "#aef" : "#1d4ed8", backgroundColor: isDark ? "rgba(29, 78, 216, 0.2)" : "#dbeafe" }}>{totals.ent_total}</td>
               <td style={cell}></td>
             </tr>
           </tfoot>
@@ -344,6 +354,10 @@ function ReportContent({
 
       {/* Summary footer */}
       <div style={{ marginTop: "1.25rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: printMode ? "8pt" : "0.65rem", color: isDark ? "#888" : "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>Jornadas</p>
+          <p style={{ margin: 0, fontSize: printMode ? "14pt" : "1.4rem", fontWeight: 900, color: isDark ? "#fff" : "#111" }}>{rendiciones.length}</p>
+        </div>
         <div style={{ textAlign: "center" }}>
           <p style={{ margin: 0, fontSize: printMode ? "8pt" : "0.65rem", color: isDark ? "#888" : "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>Total Rec</p>
           <p style={{ margin: 0, fontSize: printMode ? "14pt" : "1.4rem", fontWeight: 900, color: isDark ? "#fff" : "#111" }}>{totals.rec_total}</p>
@@ -355,10 +369,6 @@ function ReportContent({
         <div style={{ textAlign: "center" }}>
           <p style={{ margin: 0, fontSize: printMode ? "8pt" : "0.65rem", color: isDark ? "#888" : "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>Devueltas</p>
           <p style={{ margin: 0, fontSize: printMode ? "14pt" : "1.4rem", fontWeight: 900, color: isDark ? "#f87" : "#dc2626" }}>{Math.max(0, totals.rec_total - totals.ent_total)}</p>
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ margin: 0, fontSize: printMode ? "8pt" : "0.65rem", color: isDark ? "#888" : "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>Jornadas</p>
-          <p style={{ margin: 0, fontSize: printMode ? "14pt" : "1.4rem", fontWeight: 900, color: isDark ? "#fff" : "#111" }}>{rendiciones.length}</p>
         </div>
       </div>
     </div>

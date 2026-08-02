@@ -145,8 +145,12 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
           ? customEnt[k] * (cfg.depende_kpi && kpiLogrado ? cfg.con_kpi || 0 : cfg.base || 0)
           : 0;
       });
+      const pisoVal = Number(hc?.piso) || 0;
       const ingTotal = ingCte + ingExt + ingCod + ingPxp + customKeys.reduce((s, k) => s + customIng[k], 0);
+      const pisoConIva = ingTotal === 0 ? 0 : Math.round(pisoVal * (1 + IVA_RATE));
       const iva = Math.round(ingTotal * IVA_RATE);
+      const totalConIva = ingTotal + iva;
+      const totalGeneral = totalConIva + pisoConIva;
       const recStd = (r.rec_cte||0)+(r.rec_ext||0)+(r.rec_cod||0)+(r.rec_pxp||0);
       const entStd = (r.ent_cte||0)+(r.ent_ext||0)+(r.ent_cod||0)+(r.ent_pxp||0);
       return {
@@ -157,16 +161,17 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
         ent_total: entStd + customKeys.reduce((s,k)=>s+customEnt[k],0),
         customRec, customEnt, customIng,
         ing_cte: ingCte, ing_ext: ingExt, ing_cod: ingCod, ing_pxp: ingPxp,
-        ing_total: ingTotal, iva, total_con_iva: ingTotal + iva,
+        ing_total: ingTotal, iva, total_con_iva: totalConIva, piso_con_iva: pisoConIva, total_general: totalGeneral,
+        folio: r.folio,
       };
     });
   }, [rendiciones, cuentaHistorial, cuenta, customKeys, invertOrder]);
 
   const sum = useMemo(() => {
-    const s = { rec_cte:0,rec_ext:0,rec_cod:0,rec_pxp:0,rec_total:0,ent_cte:0,ent_ext:0,ent_cod:0,ent_pxp:0,ent_total:0,ing_cte:0,ing_ext:0,ing_cod:0,ing_pxp:0,ing_total:0,iva:0,total_con_iva:0,customRec:{},customEnt:{},customIng:{},jornadas:rows.length };
+    const s = { rec_cte:0,rec_ext:0,rec_cod:0,rec_pxp:0,rec_total:0,ent_cte:0,ent_ext:0,ent_cod:0,ent_pxp:0,ent_total:0,ing_cte:0,ing_ext:0,ing_cod:0,ing_pxp:0,ing_total:0,iva:0,total_con_iva:0,piso_con_iva:0,total_general:0,customRec:{},customEnt:{},customIng:{},jornadas:rows.length };
     customKeys.forEach((k)=>{ s.customRec[k]=0; s.customEnt[k]=0; s.customIng[k]=0; });
     rows.forEach((r)=>{
-      ["rec_cte","rec_ext","rec_cod","rec_pxp","rec_total","ent_cte","ent_ext","ent_cod","ent_pxp","ent_total","ing_cte","ing_ext","ing_cod","ing_pxp","ing_total","iva","total_con_iva"].forEach(f=>{ s[f]+=r[f]; });
+      ["rec_cte","rec_ext","rec_cod","rec_pxp","rec_total","ent_cte","ent_ext","ent_cod","ent_pxp","ent_total","ing_cte","ing_ext","ing_cod","ing_pxp","ing_total","iva","total_con_iva","piso_con_iva","total_general"].forEach(f=>{ s[f]+=(r[f]||0); });
       customKeys.forEach((k)=>{ s.customRec[k]+=r.customRec[k]||0; s.customEnt[k]+=r.customEnt[k]||0; s.customIng[k]+=r.customIng[k]||0; });
     });
     return s;
@@ -178,7 +183,7 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
 
   const recCols = 4 + customKeys.length + 1;
   const entCols = 4 + customKeys.length + 1;
-  const pagCols = 4 + customKeys.length + 3;
+  const pagCols = 4 + customKeys.length + 5;
 
   const recBg  = areaBg("rec",  isDark);
   const rendBg = areaBg("rend", isDark);
@@ -231,7 +236,9 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
             {customKeys.map((k) => <HC key={`ph_${k}`} style={{ background: pagBg, color: AREA.pagos.text }} fontSize={10}>{k}</HC>)}
             <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Sub</HC>
             <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>IVA</HC>
-            <HC style={{ fontWeight: 900, background: totBg, color: AREA.total.text }} fontSize={10}>Total</HC>
+            <HC style={{ fontWeight: 900, background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Total</HC>
+            <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Piso con IVA</HC>
+            <HC style={{ fontWeight: 900, background: totBg, color: AREA.total.text }} fontSize={10}>Total General</HC>
           </tr>
           {/* SUMMARY ROW */}
           <tr style={{ background: bgSummary, fontWeight: 800, borderBottom: `2px solid ${isDark ? "#333" : "#D1D5DB"}` }}>
@@ -264,9 +271,11 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
             <Pay v={sum.ing_cod} bold area="pagos" isDark={isDark} />
             <Pay v={sum.ing_pxp} bold area="pagos" isDark={isDark} />
             {customKeys.map((k) => <Pay key={`ps_${k}`} v={sum.customIng[k]} bold area="pagos" isDark={isDark} />)}
-            <Pay v={sum.ing_total} bold area="pagos" isTotal isDark={isDark} />
-            <Pay v={sum.iva} bold area="pagos" isTotal isDark={isDark} color={textMuted} />
-            <Pay v={sum.total_con_iva} bold area="total" isTotal isDark={isDark} color="#B45309" />
+            <Pay v={sum.ing_total}    bold area="pagos" isTotal isDark={isDark} />
+            <Pay v={sum.iva}           bold area="pagos" isTotal isDark={isDark} color={textMuted} />
+            <Pay v={sum.total_con_iva} bold area="pagos" isTotal isDark={isDark} />
+            <Pay v={sum.piso_con_iva}  bold area="pagos" isTotal isDark={isDark} color={textMuted} />
+            <Pay v={sum.total_general} bold area="total" isTotal isDark={isDark} color="#B45309" />
           </tr>
         </thead>
         <tbody>
@@ -280,7 +289,15 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
                     {r.kpiLogrado ? "✓" : "✗"}
                   </span>
                 </div>
-                <div style={{ fontSize: "8px", color: textMuted, marginTop: 1 }}>F: —</div>
+                {r.folio ? (
+                  r.folio.split(", ").map((f, idx) => (
+                    <div key={idx} style={{ fontSize: "8px", color: textMuted, marginTop: 1, lineHeight: 1.1 }}>
+                      F: {f}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: "8px", color: textMuted, marginTop: 1 }}>F: —</div>
+                )}
               </td>
               {/* REC */}
               <Num v={r.rec_cte} area="rec"  isFirst isDark={isDark} />
@@ -302,9 +319,11 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta }) {
               <Pay v={r.ing_cod} area="pagos" isDark={isDark} />
               <Pay v={r.ing_pxp} area="pagos" isDark={isDark} />
               {customKeys.map((k) => <Pay key={`pc_${k}_${i}`} v={r.customIng[k]} area="pagos" isDark={isDark} />)}
-              <Pay v={r.ing_total} bold area="pagos" isTotal isDark={isDark} />
-              <Pay v={r.iva}       area="pagos" isTotal isDark={isDark} color={textMuted} />
-              <Pay v={r.total_con_iva} bold area="total" isTotal isDark={isDark} color="#B45309" />
+              <Pay v={r.ing_total}    bold area="pagos" isTotal isDark={isDark} />
+              <Pay v={r.iva}           area="pagos" isTotal isDark={isDark} color={textMuted} />
+              <Pay v={r.total_con_iva} bold area="pagos" isTotal isDark={isDark} />
+              <Pay v={r.piso_con_iva}  area="pagos" isTotal isDark={isDark} color={textMuted} />
+              <Pay v={r.total_general} bold area="total" isTotal isDark={isDark} color="#B45309" />
             </tr>
           ))}
         </tbody>

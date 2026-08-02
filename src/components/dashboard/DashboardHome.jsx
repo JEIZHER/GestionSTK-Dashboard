@@ -5,7 +5,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 import IngresosModule from './IngresosModule';
 import TableView from './TableView';
-import ReporteRendicion from './ReporteRendicion';
+import ReporteRendicion, { triggerPrintHTML } from './ReporteRendicion';
 import { 
   User, 
   Settings, 
@@ -218,6 +218,14 @@ export default function DashboardHome() {
         existing.kpi_logrado = r.kpi_logrado;
       }
 
+      if (r.folio) {
+        const foliosSet = new Set(existing.folio ? existing.folio.split(", ").map(f => f.trim()) : []);
+        r.folio.split(", ").forEach(f => {
+          if (f.trim()) foliosSet.add(f.trim());
+        });
+        existing.folio = Array.from(foliosSet).join(", ");
+      }
+
       existing.rec_cte += (r.rec_cte || 0);
       existing.ent_cte += (r.ent_cte || 0);
       existing.dev_cte += (r.dev_cte || 0);
@@ -259,8 +267,54 @@ export default function DashboardHome() {
         (r.ent_cod || 0) +
         (r.ent_pxp || 0);
 
-      map.set(key, existing);
+    map.set(key, existing);
     });
+
+    const items = Array.from(map.values());
+    if (items.length === 0) return [];
+
+    // Ordenar fechas existentes para obtener rango min y max
+    const dates = items.map(i => i.fecha).sort();
+    const minDateStr = dates[0];
+    const maxDateStr = dates[dates.length - 1];
+
+    // Helper para formatear YYYY-MM-DD local sin problemas de zona horaria
+    const formatYMD = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Rellenar días faltantes (Lunes a Sábado) entre min y max
+    const [minY, minM, minD] = minDateStr.split('-').map(Number);
+    const [maxY, maxM, maxD] = maxDateStr.split('-').map(Number);
+
+    let curr = new Date(minY, minM - 1, minD);
+    const end = new Date(maxY, maxM - 1, maxD);
+
+    while (curr <= end) {
+      const dayOfWeek = curr.getDay(); // 0 = Domingo
+      const dateKey = formatYMD(curr);
+
+      // Si no es domingo (dayOfWeek !== 0) y no existe la fecha en la DB, agregar fila en 0
+      if (dayOfWeek !== 0 && !map.has(dateKey)) {
+        map.set(dateKey, {
+          fecha: dateKey,
+          rec_cte: 0, ent_cte: 0, dev_cte: 0,
+          rec_ext: 0, ent_ext: 0, dev_ext: 0,
+          rec_cod: 0, ent_cod: 0, dev_cod: 0,
+          rec_pxp: 0, ent_pxp: 0, dev_pxp: 0,
+          datos_custom: {},
+          _total_rec: 0,
+          _total_ent: 0,
+          kpi_logrado: true,
+          folio: "—",
+        });
+      }
+
+      curr.setDate(curr.getDate() + 1);
+    }
 
     return Array.from(map.values())
       .map(item => {
@@ -892,39 +946,94 @@ export default function DashboardHome() {
                     </div>
                   </div>
 
-                  {/* Filtro de Fechas */}
-                  <div 
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ 
-                      display: "flex", 
-                      alignItems: "center", 
-                      gap: "0.75rem", 
-                      backgroundColor: theme.sidebar, 
-                      padding: "0.6rem 1rem", 
-                      borderRadius: "16px",
-                      border: `1px solid ${theme.border}`,
-                      boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-                      position: "relative",
-                      zIndex: 1000,
-                      width: isMobile ? "100%" : "auto",
-                      justifyContent: "space-between"
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <CalendarDays size={16} color={theme.accent} />
+                  {/* Filtro de Fechas y Botón Imprimir */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
+                    <button
+                      onClick={() => {
+                        const hiddenEl = document.getElementById("hidden-report-container");
+                        if (hiddenEl) {
+                          triggerPrintHTML(hiddenEl.innerHTML);
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.6rem 1.1rem",
+                        borderRadius: "16px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.primary,
+                        color: "#000",
+                        fontWeight: 800,
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        boxShadow: `0 4px 14px -4px ${theme.primary}66`,
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      <FileText size={16} />
+                      Generar PDF / Imprimir
+                    </button>
+
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "0.75rem", 
+                        backgroundColor: theme.sidebar, 
+                        padding: "0.6rem 1rem", 
+                        borderRadius: "16px",
+                        border: `1px solid ${theme.border}`,
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                        position: "relative",
+                        zIndex: 1000,
+                        width: isMobile ? "100%" : "auto",
+                        justifyContent: "space-between"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <CalendarDays size={16} color={theme.accent} />
+                        <input 
+                          id="dashboard_date_from"
+                          name="dashboard_date_from"
+                          aria-label="Fecha inicio dashboard"
+                          type="date" 
+                          value={dateRange.from}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (e.target.showPicker) e.target.showPicker();
+                          }}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setDateRange(prev => ({ ...prev, from: e.target.value }));
+                          }}
+                          style={{ 
+                            background: "none", 
+                            border: "none", 
+                            color: theme.text, 
+                            fontSize: "0.8rem", 
+                            fontWeight: 700,
+                            outline: "none",
+                            cursor: "pointer",
+                            width: isMobile ? "85px" : "auto"
+                          }}
+                        />
+                      </div>
+                      <ArrowRight size={14} color="#888" />
                       <input 
-                        id="dashboard_date_from"
-                        name="dashboard_date_from"
-                        aria-label="Fecha inicio dashboard"
+                        id="dashboard_date_to"
+                        name="dashboard_date_to"
+                        aria-label="Fecha fin dashboard"
                         type="date" 
-                        value={dateRange.from}
+                        value={dateRange.to}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (e.target.showPicker) e.target.showPicker();
                         }}
                         onChange={(e) => {
                           e.stopPropagation();
-                          setDateRange(prev => ({ ...prev, from: e.target.value }));
+                          setDateRange(prev => ({ ...prev, to: e.target.value }));
                         }}
                         style={{ 
                           background: "none", 
@@ -938,32 +1047,6 @@ export default function DashboardHome() {
                         }}
                       />
                     </div>
-                    <ArrowRight size={14} color="#888" />
-                    <input 
-                      id="dashboard_date_to"
-                      name="dashboard_date_to"
-                      aria-label="Fecha fin dashboard"
-                      type="date" 
-                      value={dateRange.to}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (e.target.showPicker) e.target.showPicker();
-                      }}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setDateRange(prev => ({ ...prev, to: e.target.value }));
-                      }}
-                      style={{ 
-                        background: "none", 
-                        border: "none", 
-                        color: theme.text, 
-                        fontSize: "0.8rem", 
-                        fontWeight: 700,
-                        outline: "none",
-                        cursor: "pointer",
-                        width: isMobile ? "85px" : "auto"
-                      }}
-                    />
                   </div>
                 </header>
 
@@ -1208,61 +1291,61 @@ export default function DashboardHome() {
                     justifyContent: "space-between"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <CalendarDays size={16} color={theme.accent} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <CalendarDays size={16} color={theme.accent} />
+                      <input 
+                        id="inventory_date_from"
+                        name="inventory_date_from"
+                        aria-label="Fecha inicio inventario"
+                        type="date" 
+                        value={dateRange.from}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (e.target.showPicker) e.target.showPicker();
+                        }}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setDateRange(prev => ({ ...prev, from: e.target.value }));
+                        }}
+                        style={{ 
+                          background: "none", 
+                          border: "none", 
+                          color: theme.text, 
+                          fontSize: "0.8rem", 
+                          fontWeight: 700,
+                          outline: "none",
+                          cursor: "pointer",
+                          width: isMobile ? "85px" : "auto"
+                        }}
+                      />
+                    </div>
+                    <ArrowRight size={14} color="#888" />
                     <input 
-                      id="inventory_date_from"
-                      name="inventory_date_from"
-                      aria-label="Fecha inicio inventario"
+                      id="inventory_date_to"
+                      name="inventory_date_to"
+                      aria-label="Fecha fin inventario"
                       type="date" 
-                      value={dateRange.from}
+                      value={dateRange.to}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (e.target.showPicker) e.target.showPicker();
                       }}
                       onChange={(e) => {
                         e.stopPropagation();
-                        setDateRange(prev => ({ ...prev, from: e.target.value }));
+                        setDateRange(prev => ({ ...prev, to: e.target.value }));
                       }}
                       style={{ 
                         background: "none", 
                         border: "none", 
                         color: theme.text, 
                         fontSize: "0.8rem", 
-                        fontWeight: 700,
+                        fontWeight: 700, 
                         outline: "none",
                         cursor: "pointer",
                         width: isMobile ? "85px" : "auto"
                       }}
                     />
                   </div>
-                  <ArrowRight size={14} color="#888" />
-                  <input 
-                    id="inventory_date_to"
-                    name="inventory_date_to"
-                    aria-label="Fecha fin inventario"
-                    type="date" 
-                    value={dateRange.to}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (e.target.showPicker) e.target.showPicker();
-                    }}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setDateRange(prev => ({ ...prev, to: e.target.value }));
-                    }}
-                    style={{ 
-                      background: "none", 
-                      border: "none", 
-                      color: theme.text, 
-                      fontSize: "0.8rem", 
-                      fontWeight: 700, 
-                      outline: "none",
-                      cursor: "pointer",
-                      width: isMobile ? "85px" : "auto"
-                    }}
-                  />
-                </div>
               </header>
 
               {/* Resumen de Recepción y Rendición */}
@@ -1788,6 +1871,19 @@ export default function DashboardHome() {
               />
             </div>
           )}
+
+          {/* Contenedor oculto del reporte para generar PDF directo desde cualquier vista */}
+          <div id="hidden-report-container" style={{ display: "none" }}>
+            <ReporteRendicion
+              profile={profile}
+              cuenta={cuenta}
+              rendiciones={stats.rendiciones}
+              dateRange={dateRange}
+              theme={theme}
+              isDark={false}
+              hidePrintButton={true}
+            />
+          </div>
         </div>
       </main>
 
