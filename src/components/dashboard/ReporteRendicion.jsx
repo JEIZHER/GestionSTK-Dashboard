@@ -53,7 +53,7 @@ export const triggerPrintHTML = (htmlContent) => {
   setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
 };
 
-export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRange, theme, isDark, hidePrintButton }) {
+export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRange, theme, isDark, hidePrintButton, sortOrder }) {
   const reportRef = useRef(null);
 
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -218,6 +218,7 @@ export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRan
           headerCell={headerCell}
           theme={theme}
           isDark={isDark}
+          sortOrder={sortOrder}
         />
       </div>
     </div>
@@ -231,7 +232,7 @@ function ReportContent({
   empresa, tripulacion, movil, ruta, dateRange,
   rendiciones, customKeys, getCustomLabel, getCustomData,
   formatDate, isSunday, totals,
-  cell, headerCell, theme, isDark, printMode = false,
+  cell, headerCell, theme, isDark, printMode = false, sortOrder = 'desc',
 }) {
   const labelStyle = {
     fontSize: printMode ? "9pt" : "0.75rem",
@@ -300,7 +301,10 @@ function ReportContent({
             </tr>
           </thead>
           <tbody>
-            {rendiciones.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map((r, i) => {
+            {(rendiciones || []).slice().sort((a, b) => {
+              const cmp = String(a.fecha).localeCompare(String(b.fecha));
+              return sortOrder === 'desc' ? -cmp : cmp;
+            }).map((r, i) => {
               const sunday = isSunday(r.fecha);
               const rec_nac = (r.rec_cte || 0) + (r.rec_pxp || 0) + (r.rec_cod || 0);
               const ent_nac = (r.ent_cte || 0) + (r.ent_pxp || 0) + (r.ent_cod || 0);

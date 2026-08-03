@@ -129,6 +129,10 @@ export default function DashboardHome() {
     });
   };
 
+  // Sort order for table & PDF
+  const [invertOrder, setInvertOrder] = useState(false);
+  const tableSortOrder = invertOrder ? 'asc' : 'desc';
+
   // Vistas de gráficos
   const [chartViewRec, setChartViewRec] = useState("total");
   const [chartViewEnt, setChartViewEnt] = useState("total");
@@ -1069,6 +1073,8 @@ export default function DashboardHome() {
                   cuentaHistorial={cuentaHistorial}
                   cuenta={cuenta}
                   dateRange={dateRange}
+                  invertOrder={invertOrder}
+                  setInvertOrder={setInvertOrder}
                 />
               )}
 
@@ -1868,6 +1874,7 @@ export default function DashboardHome() {
                 dateRange={dateRange}
                 theme={theme}
                 isDark={isDark}
+                sortOrder={tableSortOrder}
               />
             </div>
           )}
@@ -1882,6 +1889,7 @@ export default function DashboardHome() {
               theme={theme}
               isDark={false}
               hidePrintButton={true}
+              sortOrder={tableSortOrder}
             />
           </div>
         </div>

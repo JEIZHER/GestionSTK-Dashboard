@@ -17,6 +17,7 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
     rec_cod: 0, ent_cod: 0, dev_cod: 0,
     rec_pxp: 0, ent_pxp: 0, dev_pxp: 0,
     kpi_logrado: false,
+    folio: '',
     datos_custom: {}
   });
 
@@ -68,6 +69,7 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
           ent_pxp: activity.rendicion.ent_pxp || 0,
           dev_pxp: activity.rendicion.dev_pxp || 0,
           kpi_logrado: activity.rendicion.kpi_logrado || false,
+          folio: activity.rendicion.folio || '',
           datos_custom: mergedCustom
         });
       } else {
@@ -84,7 +86,7 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
         setRendicionData({
           rec_cte: 0, ent_cte: 0, dev_cte: 0, rec_ext: 0, ent_ext: 0, dev_ext: 0,
           rec_cod: 0, ent_cod: 0, dev_cod: 0, rec_pxp: 0, ent_pxp: 0, dev_pxp: 0,
-          kpi_logrado: false, datos_custom: customKeys
+          kpi_logrado: false, folio: '', datos_custom: customKeys
         });
       }
 
@@ -350,16 +352,30 @@ export default function EditActivityModal({ isOpen, onClose, activity, onSave, t
                   ⚠️ No existe rendición para esta fecha. Los datos ingresados crearán un nuevo registro.
                 </div>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                     <label htmlFor="kpi_logrado_input" style={{ fontSize: '0.9rem', fontWeight: 700 }}>KPI Logrado (Día):</label>
-                     <input 
-                       id="kpi_logrado_input"
-                       name="kpi_logrado"
-                       type="checkbox" 
-                       checked={rendicionData.kpi_logrado}
-                       onChange={e => handleRendicionChange('kpi_logrado', e.target.checked)}
-                       style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                     />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label htmlFor="kpi_logrado_input" style={{ fontSize: '0.9rem', fontWeight: 700 }}>KPI Logrado (Día):</label>
+                  <input 
+                    id="kpi_logrado_input"
+                    name="kpi_logrado"
+                    type="checkbox" 
+                    checked={rendicionData.kpi_logrado}
+                    onChange={e => handleRendicionChange('kpi_logrado', e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '180px' }}>
+                  <label htmlFor="folio_input" style={{ fontSize: '0.9rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Folio:</label>
+                  <input 
+                    id="folio_input"
+                    name="folio"
+                    type="text" 
+                    placeholder="Ej: 12345"
+                    value={rendicionData.folio || ''}
+                    onChange={e => handleRendicionChange('folio', e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
               <div style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc', padding: '1rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`, overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
