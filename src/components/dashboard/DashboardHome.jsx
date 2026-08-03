@@ -540,20 +540,22 @@ export default function DashboardHome() {
 
         if (rendError) throw rendError;
 
-        // 6. Fetch recent activity (Actividad Reciente) independent of date filter
+        // 6. Fetch recent activity (Actividad Reciente) bounded by the selected date range
         const { data: recentRendiciones } = await supabase
           .from("rendiciones_diarias")
           .select("*")
           .eq("auth_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(100);
+          .gte("fecha", dateRange.from)
+          .lte("fecha", dateRange.to)
+          .order("fecha", { ascending: false });
 
         const { data: recentPrecision } = await supabase
           .from("reportes_precision")
           .select("*")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(100);
+          .gte("fecha", dateRange.from)
+          .lte("fecha", dateRange.to)
+          .order("fecha", { ascending: false });
 
         const mapActivity = new Map();
         
@@ -1190,7 +1192,7 @@ export default function DashboardHome() {
                      overflowY: showAllActivity ? "auto" : "visible",
                      paddingRight: showAllActivity ? "0.5rem" : "0"
                    }}>
-                     {recentActivity.slice(0, showAllActivity ? 30 : 7).map((act, i) => {
+                     {recentActivity.slice(0, showAllActivity ? recentActivity.length : 7).map((act, i) => {
                        const status = (act.rendicion && act.precision) ? "ok" : "warning";
                        const createdAt = new Date(act.rendicion?.created_at || act.precision?.created_at || act.fecha);
                        const createdTimeStr = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });

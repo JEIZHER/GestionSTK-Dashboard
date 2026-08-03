@@ -175,9 +175,9 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
 
       const ingTotal = ingCte + ingExt + ingCod + ingPxp + customKeys.reduce((s, k) => s + customIng[k], 0);
       const pisoVal = ingTotal === 0 ? 0 : (Number(hc?.piso) || 0);
-      const subtotalNeto = ingTotal + pisoVal;
-      const iva = Math.round(subtotalNeto * IVA_RATE);
-      const total = subtotalNeto + iva;
+      const sub2 = ingTotal + pisoVal;
+      const iva = Math.round(sub2 * IVA_RATE);
+      const total = sub2 + iva;
 
       return {
         fecha: r.fecha, kpiLogrado, kpiVal, rec_kpi: recKpiTotal, ent_kpi: entKpiTotal, rec_total: recTotal, ent_total: entTotal,
@@ -185,19 +185,19 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
         ent_cte: r.ent_cte||0, ent_ext: r.ent_ext||0, ent_cod: r.ent_cod||0, ent_pxp: r.ent_pxp||0,
         customRec, customEnt, customIng,
         ing_cte: ingCte, ing_ext: ingExt, ing_cod: ingCod, ing_pxp: ingPxp,
-        ing_total: ingTotal, piso: pisoVal, iva, total,
+        ing_total: ingTotal, piso: pisoVal, sub2, iva, total,
         folio: r.folio,
       };
     });
   }, [rendiciones, cuentaHistorial, cuenta, customKeys, invertOrder]);
 
   const sum = useMemo(() => {
-    const s = { rec_kpi:0,ent_kpi:0,rec_cte:0,rec_ext:0,rec_cod:0,rec_pxp:0,rec_total:0,ent_cte:0,ent_ext:0,ent_cod:0,ent_pxp:0,ent_total:0,ing_cte:0,ing_ext:0,ing_cod:0,ing_pxp:0,ing_total:0,piso:0,iva:0,total:0,customRec:{},customEnt:{},customIng:{},jornadas:rows.length };
+    const s = { rec_kpi:0,ent_kpi:0,rec_cte:0,rec_ext:0,rec_cod:0,rec_pxp:0,rec_total:0,ent_cte:0,ent_ext:0,ent_cod:0,ent_pxp:0,ent_total:0,ing_cte:0,ing_ext:0,ing_cod:0,ing_pxp:0,ing_total:0,piso:0,sub2:0,iva:0,total:0,customRec:{},customEnt:{},customIng:{},jornadas:rows.length };
     customKeys.forEach((k)=>{ s.customRec[k]=0; s.customEnt[k]=0; s.customIng[k]=0; });
     rows.forEach((r)=>{
       s.rec_kpi += (r.rec_kpi || 0);
       s.ent_kpi += (r.ent_kpi || 0);
-      ["rec_cte","rec_ext","rec_cod","rec_pxp","rec_total","ent_cte","ent_ext","ent_cod","ent_pxp","ent_total","ing_cte","ing_ext","ing_cod","ing_pxp","ing_total","piso","iva","total"].forEach(f=>{ s[f]+=(r[f]||0); });
+      ["rec_cte","rec_ext","rec_cod","rec_pxp","rec_total","ent_cte","ent_ext","ent_cod","ent_pxp","ent_total","ing_cte","ing_ext","ing_cod","ing_pxp","ing_total","piso","sub2","iva","total"].forEach(f=>{ s[f]+=(r[f]||0); });
       customKeys.forEach((k)=>{ s.customRec[k]+=r.customRec[k]||0; s.customEnt[k]+=r.customEnt[k]||0; s.customIng[k]+=r.customIng[k]||0; });
     });
     return s;
@@ -209,7 +209,7 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
 
   const recCols = 4 + customKeys.length + 1;
   const entCols = 4 + customKeys.length + 1;
-  const pagCols = 4 + customKeys.length + 4;
+  const pagCols = 4 + customKeys.length + 5;
 
   const recBg  = areaBg("rec",  isDark);
   const rendBg = areaBg("rend", isDark);
@@ -261,8 +261,9 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
             <HC style={{ background: pagBg, color: AREA.pagos.text }} fontSize={10}>COD</HC>
             <HC style={{ background: pagBg, color: AREA.pagos.text }} fontSize={10}>PxP</HC>
             {customKeys.map((k) => <HC key={`ph_${k}`} style={{ background: pagBg, color: AREA.pagos.text }} fontSize={10}>{k}</HC>)}
-            <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Sub</HC>
+            <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Sub-1</HC>
             <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Piso</HC>
+            <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>Sub-2</HC>
             <HC style={{ background: pagTBg, color: AREA.pagos.text }} fontSize={10}>IVA</HC>
             <HC style={{ fontWeight: 900, background: totBg, color: AREA.total.text }} fontSize={10}>Total</HC>
           </tr>
@@ -302,6 +303,7 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
             {customKeys.map((k) => <Pay key={`ps_${k}`} v={sum.customIng[k]} bold area="pagos" isDark={isDark} />)}
             <Pay v={sum.ing_total} bold area="pagos" isTotal isDark={isDark} />
             <Pay v={sum.piso}      bold area="pagos" isTotal isDark={isDark} color={textMuted} />
+            <Pay v={sum.sub2}      bold area="pagos" isTotal isDark={isDark} color={textMuted} />
             <Pay v={sum.iva}       bold area="pagos" isTotal isDark={isDark} color={textMuted} />
             <Pay v={sum.total}     bold area="total" isTotal isDark={isDark} color="#B45309" />
           </tr>
@@ -348,6 +350,7 @@ export default function TableView({ rendiciones, cuentaHistorial, cuenta, invert
               {customKeys.map((k) => <Pay key={`pc_${k}_${i}`} v={r.customIng[k]} area="pagos" isDark={isDark} />)}
               <Pay v={r.ing_total} bold area="pagos" isTotal isDark={isDark} />
               <Pay v={r.piso}      area="pagos" isTotal isDark={isDark} color={textMuted} />
+              <Pay v={r.sub2}      area="pagos" isTotal isDark={isDark} color={textMuted} />
               <Pay v={r.iva}       area="pagos" isTotal isDark={isDark} color={textMuted} />
               <Pay v={r.total}     bold area="total" isTotal isDark={isDark} color="#B45309" />
             </tr>
