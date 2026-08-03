@@ -22,27 +22,26 @@ export const triggerPrintHTML = (htmlContent) => {
       <title>Reporte de Rendición</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #111; padding: 12mm 10mm; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-        th { background: #f3f4f6; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; padding: 5px 6px; border: 1px solid #d1d5db; text-align: center; }
-        td { font-size: 8.5pt; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; padding: 6mm 8mm; }
+        table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+        th { background: #f3f4f6; font-size: 7pt; font-weight: 800; text-transform: uppercase; padding: 3px 5px; border: 1px solid #d1d5db; text-align: center; }
+        td { font-size: 8pt; padding: 2px 5px; border-bottom: 1px solid #e5e7eb; text-align: center; }
         td:first-child, th:first-child { text-align: left; }
         .ent { color: #1d4ed8; font-weight: 700; }
-        .total-row td { font-weight: 900; border-top: 2px solid #d1d5db; color: #1d4ed8; }
-        .summary { margin-top: 14px; display: flex; gap: 24px; }
+        .total-row td { font-weight: 900; border-top: 2px solid #d1d5db; }
+        .summary { margin-top: 8px; display: flex; gap: 24px; }
         .summary-item p:first-child { font-size: 7pt; color: #6b7280; text-transform: uppercase; font-weight: 700; }
-        .summary-item p:last-child { font-size: 16pt; font-weight: 900; }
+        .summary-item p:last-child { font-size: 14pt; font-weight: 900; }
         .dev { color: #dc2626; }
-        h2 { font-size: 13pt; font-weight: 900; margin-bottom: 10px; }
-        .meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px 16px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
-        .meta .label { font-size: 7pt; color: #6b7280; }
-        .meta .value { font-size: 9pt; font-weight: 700; }
+        h2 { font-size: 11pt; font-weight: 900; margin-bottom: 4px; }
+        .meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px 12px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid #e5e7eb; }
+        .meta .label { font-size: 6.5pt; color: #6b7280; }
+        .meta .value { font-size: 8pt; font-weight: 700; }
         .sunday-row { opacity: 0.35; }
-        /* Evitar que el tfoot (totales) se repita al pie de cada página intermedia */
         tfoot { display: table-row-group; page-break-inside: avoid; }
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
-        @page { size: A4 portrait; margin: 12mm 10mm; }
+        @page { size: A4 portrait; margin: 6mm 8mm; }
       </style>
     </head>
     <body>${htmlContent}</body>
@@ -141,25 +140,6 @@ export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRan
   
   const tripulacion = profile?.nombre || "—";
 
-  // ── styles (used both on screen and in print via @media print) ────────────
-  const cell = {
-    padding: "4px 8px",
-    fontSize: "0.75rem",
-    textAlign: "center",
-    borderBottom: `1px solid ${isDark ? "#333" : "#e5e7eb"}`,
-    whiteSpace: "nowrap",
-  };
-  const headerCell = {
-    ...cell,
-    fontWeight: 800,
-    fontSize: "0.65rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    backgroundColor: isDark ? "#1a1a1a" : "#f3f4f6",
-    color: isDark ? "#aaa" : "#374151",
-    padding: "6px 8px",
-  };
-
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Toolbar */}
@@ -214,8 +194,6 @@ export default function ReporteRendicion({ profile, cuenta, rendiciones, dateRan
           formatDate={formatDate}
           isSunday={isSunday}
           totals={totals}
-          cell={cell}
-          headerCell={headerCell}
           theme={theme}
           isDark={isDark}
           sortOrder={sortOrder}
@@ -232,8 +210,26 @@ function ReportContent({
   empresa, tripulacion, movil, ruta, dateRange,
   rendiciones, customKeys, getCustomLabel, getCustomData,
   formatDate, isSunday, totals,
-  cell, headerCell, theme, isDark, printMode = false, sortOrder = 'desc',
+  theme, isDark, printMode = false, sortOrder = 'desc',
 }) {
+  const cell = {
+    padding: printMode ? "2px 5px" : "3px 6px",
+    fontSize: printMode ? "8pt" : "0.7rem",
+    textAlign: "center",
+    borderBottom: `1px solid ${isDark ? "#333" : "#e5e7eb"}`,
+    whiteSpace: "nowrap",
+  };
+  const headerCell = {
+    ...cell,
+    fontWeight: 800,
+    fontSize: printMode ? "7pt" : "0.6rem",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    backgroundColor: isDark ? "#1a1a1a" : "#f3f4f6",
+    color: isDark ? "#aaa" : "#374151",
+    padding: printMode ? "3px 5px" : "4px 6px",
+  };
+
   const labelStyle = {
     fontSize: printMode ? "9pt" : "0.75rem",
     color: isDark ? "#aaa" : "#6b7280",
@@ -249,11 +245,11 @@ function ReportContent({
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: "1.25rem", borderBottom: `2px solid ${isDark ? "#333" : "#e5e7eb"}`, paddingBottom: "1rem" }}>
-        <h2 style={{ margin: "0 0 0.75rem", fontSize: printMode ? "13pt" : "1.1rem", fontWeight: 900, letterSpacing: "-0.02em", color: isDark ? "#fff" : "#111" }}>
+      <div style={{ marginBottom: printMode ? "0.3rem" : "0.75rem", borderBottom: `2px solid ${isDark ? "#333" : "#e5e7eb"}`, paddingBottom: printMode ? "0.3rem" : "0.6rem" }}>
+        <h2 style={{ margin: printMode ? "0 0 0.2rem" : "0 0 0.5rem", fontSize: printMode ? "11pt" : "1.1rem", fontWeight: 900, letterSpacing: "-0.02em", color: isDark ? "#fff" : "#111" }}>
           Reporte de Rendición Diaria
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem 1.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: printMode ? "0.15rem 1rem" : "0.5rem 1.5rem" }}>
           <div>
             <p style={labelStyle}>EMPRESA</p>
             <p style={valueStyle}>{empresa}</p>
@@ -343,13 +339,13 @@ function ReportContent({
           </tbody>
           <tfoot>
             <tr style={{ borderTop: `2px solid ${isDark ? "#444" : "#d1d5db"}` }}>
-              <td style={{ ...cell, textAlign: "left", fontWeight: 900, fontSize: "0.8rem" }}>TOTAL</td>
-              <td style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_nac}</td>
-              <td style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.ent_ext}</td>
+              <td style={{ ...cell, textAlign: "left", fontWeight: 900 }}>TOTAL</td>
+              <td style={{ ...cell, fontWeight: 900 }}>{totals.ent_nac}</td>
+              <td style={{ ...cell, fontWeight: 900 }}>{totals.ent_ext}</td>
               {customKeys.map(k => (
-                <td key={k} style={{ ...cell, fontWeight: 900, fontSize: "1.1rem", color: isDark ? "#aef" : "#1d4ed8" }}>{totals.custom[k]?.ent || 0}</td>
+                <td key={k} style={{ ...cell, fontWeight: 900 }}>{totals.custom[k]?.ent || 0}</td>
               ))}
-              <td style={{ ...cell, fontWeight: 950, fontSize: "1.35rem", color: isDark ? "#aef" : "#1d4ed8", backgroundColor: isDark ? "rgba(29, 78, 216, 0.2)" : "#dbeafe" }}>{totals.ent_total}</td>
+              <td style={{ ...cell, fontWeight: 900 }}>{totals.ent_total}</td>
               <td style={cell}></td>
             </tr>
           </tfoot>
