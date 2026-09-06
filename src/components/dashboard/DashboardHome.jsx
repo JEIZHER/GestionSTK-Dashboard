@@ -58,7 +58,23 @@ export default function DashboardHome() {
     rendiciones: []
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      if (view === "manual") return "manual";
+      if (view === "reporte") return "reporte";
+    } catch (_) {}
+    return "inventory";
+  });
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      if (view === "manual") setActiveTab("manual");
+    } catch (_) {}
+  }, []);
   const [visibleCurves, setVisibleCurves] = useState(['total']);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
