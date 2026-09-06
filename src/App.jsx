@@ -1,12 +1,31 @@
 import React from 'react';
 import { useAuth } from './hooks/useAuth';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import Login from './components/auth/Login';
 import DashboardHome from './components/dashboard/DashboardHome';
+import ManualView from './components/dashboard/ManualView';
 import { Loader2 } from 'lucide-react';
+
+function StandaloneManual() {
+  const { theme } = useTheme();
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: theme.background, color: theme.text, padding: '1rem' }}>
+      <ManualView theme={theme} isMobile={window.innerWidth <= 768} />
+    </div>
+  );
+}
 
 function App() {
   const { user, loading } = useAuth();
+  const isManualView = new URLSearchParams(window.location.search).get('view') === 'manual';
+
+  if (isManualView) {
+    return (
+      <ThemeProvider>
+        <StandaloneManual />
+      </ThemeProvider>
+    );
+  }
 
   if (loading) {
     return (

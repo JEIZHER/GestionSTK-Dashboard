@@ -716,6 +716,7 @@ export default function DashboardHome() {
               onClick={() => { setActiveTab("ingresos"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
+            {/* ESTADÍSTICAS (Oculta por el momento)
             <SidebarItem 
               icon={<BarChart3 size={19} />} 
               label="ESTADÍSTICAS" 
@@ -723,13 +724,7 @@ export default function DashboardHome() {
               onClick={() => { setActiveTab("estadisticas"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
-            <SidebarItem 
-              icon={<Settings size={19} />} 
-              label="Vincular Settings" 
-              active={activeTab === "settings"} 
-              onClick={() => { setActiveTab("settings"); if(isMobile) setIsSidebarOpen(false); }}
-              theme={theme}
-            />
+            */}
             <SidebarItem 
               icon={<FileText size={19} />} 
               label="REPORTE" 
@@ -1816,7 +1811,8 @@ export default function DashboardHome() {
             </div>
           )}
 
-          {activeTab === "estadisticas" && (
+          {/* ESTADÍSTICAS (Oculta por el momento)
+          activeTab === "estadisticas" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
                <header style={{ 
                  marginBottom: "2rem",
@@ -1832,61 +1828,8 @@ export default function DashboardHome() {
                 <p style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666" }}>Cargando métricas de precisión y volumen...</p>
               </div>
             </div>
-          )}
-
-          {activeTab === "settings" && (
-            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-               <header style={{ 
-                 marginBottom: "3rem",
-                 paddingLeft: (isMobile && !isSidebarOpen) ? "2.5rem" : "0",
-                 transition: "padding 0.3s"
-               }}>
-                <h2 style={{ fontSize: isMobile ? "1.8rem" : "2.25rem", fontWeight: 900, margin: 0, letterSpacing: "-0.04em" }}>Vincular Settings</h2>
-                <p style={{ color: isDark ? "#888" : "#666", marginTop: "0.5rem", fontSize: isMobile ? "0.95rem" : "1.05rem" }}>Sincroniza tus preferencias con la aplicación móvil</p>
-              </header>
-              <div style={{ 
-                backgroundColor: theme.sidebar, 
-                borderRadius: "24px", 
-                border: `1px solid ${theme.border}`,
-                padding: "2.5rem",
-                boxShadow: "0 10px 40px -10px rgba(0,0,0,0.05)"
-              }}>
-                <div style={{ marginBottom: "2rem" }}>
-                  <h4 style={{ fontSize: "0.9rem", fontWeight: 800, color: theme.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>Vinculación de Cuenta</h4>
-                  <div style={{ padding: "1.5rem", backgroundColor: theme.card, borderRadius: "16px", border: `1px solid ${theme.border}`, textAlign: 'center' }}>
-                     <RefreshCcw size={32} style={{ color: theme.primary, marginBottom: '1rem' }} />
-                     <p style={{ fontWeight: 700, margin: '0 0 0.5rem' }}>Escanear Código QR</p>
-                     <p style={{ fontSize: "0.85rem", color: isDark ? "#888" : "#666", margin: "0 0 1.5rem" }}>Abre la App GestionSTK en tu teléfono y escanea este panel para sincronizar tus sectores y zonas personalizadas.</p>
-                     <div style={{ width: '150px', height: '150px', backgroundColor: '#EEE', margin: '0 auto', display: 'flex', alignItems: 'center', justifyItems: 'center', borderRadius: '12px', border: `2px dashed ${theme.border}` }}>
-                        <span style={{ fontSize: '0.7rem', color: '#999', width: '100%' }}>QR Placeholder</span>
-                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: "0.9rem", fontWeight: 800, color: theme.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>Apariencia (Sincronizada)</h4>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem", backgroundColor: theme.card, borderRadius: "16px", border: `1px solid ${theme.border}` }}>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem" }}>Tema Visual</p>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: isDark ? "#888" : "#666" }}>Actualmente: {isDark ? 'Dark Mode (GestionSTK)' : 'Light Mode (GestionSTK)'}</p>
-                    </div>
-                    <button onClick={toggleTheme} style={{ 
-                        padding: "0.6rem 1.25rem", 
-                        borderRadius: "12px", 
-                        cursor: "pointer", 
-                        backgroundColor: theme.accent, 
-                        color: "white", 
-                        border: "none",
-                        fontWeight: 700,
-                        fontSize: "0.85rem"
-                      }}>
-                      Cambiar Tema
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          )
+          */}
 
           {activeTab === "reporte" && (
             <div style={{ animation: "fadeIn 0.4s ease-out", padding: isMobile ? "1.5rem 1rem" : "2.5rem 2rem" }}>
