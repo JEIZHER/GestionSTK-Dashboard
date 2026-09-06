@@ -24,8 +24,10 @@ import {
   ArrowRight,
   Monitor,
   Table2,
-  FileText
+  FileText,
+  BookOpen
 } from "lucide-react";
+import ManualView from './ManualView';
 import { 
   AreaChart, 
   Area, 
@@ -717,6 +719,13 @@ export default function DashboardHome() {
               label="REPORTE" 
               active={activeTab === "reporte"} 
               onClick={() => { setActiveTab("reporte"); if(isMobile) setIsSidebarOpen(false); }}
+              theme={theme}
+            />
+            <SidebarItem 
+              icon={<BookOpen size={19} />} 
+              label="MANUAL DE USUARIO" 
+              active={activeTab === "manual"} 
+              onClick={() => { setActiveTab("manual"); if(isMobile) setIsSidebarOpen(false); }}
               theme={theme}
             />
           </nav>
@@ -1878,6 +1887,12 @@ export default function DashboardHome() {
                 isDark={isDark}
                 sortOrder={tableSortOrder}
               />
+            </div>
+          )}
+
+          {activeTab === "manual" && (
+            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+              <ManualView theme={theme} isMobile={isMobile} />
             </div>
           )}
 
